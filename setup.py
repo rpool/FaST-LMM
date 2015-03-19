@@ -9,7 +9,7 @@ from Cython.Distutils import build_ext
 import numpy
 
 # Version number
-version = '0.2.9'
+version = '0.2.13'
 
 
 def readme():
@@ -108,7 +108,7 @@ setup(
                        "examples/toydataTrain.phe"
 					   ]
                  },
-    install_requires = ['cython', 'numpy', 'scipy', 'pandas', 'scikit-learn', 'matplotlib', 'pysnptools'],
+    install_requires = ['scipy>=0.13', 'numpy>=1.6', 'matplotlib>=1.2', 'pandas>=0.15.2', 'scikit-learn>=0.15.2', 'pysnptools'],
     cmdclass = {'build_ext': build_ext, 'clean': CleanCommand},
     ext_modules = ext_modules,
   )
