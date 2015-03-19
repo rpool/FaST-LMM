@@ -112,4 +112,3 @@ setup(
     cmdclass = {'build_ext': build_ext, 'clean': CleanCommand},
     ext_modules = ext_modules,
   )
-
