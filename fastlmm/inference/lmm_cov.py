@@ -89,7 +89,7 @@ class LMM(object):
 		K_ = self.linreg.regress(Y=self.K)
 		K_ = self.linreg.regress(Y=K_.T)
 		[self.S,self.U] = la.eigh(K_)
-		if np.any(np.diagonal(self.S) < -0.1):
+		if np.any(self.S < -0.1):
 		    logging.warning("kernel contains a negative Eigenvalue")
 
 		self.U = self.U[:,D:N]
@@ -110,7 +110,7 @@ class LMM(object):
 				PxG = self.linreg.regress(Y=self.G)
 				try:
 					[self.U,self.S,V] = la.svd(PxG,False,True)
-					if np.any(np.diagonal(self.S) < -0.1):
+					if np.any(self.S < -0.1):
 					    logging.warning("kernel contains a negative Eigenvalue")
 					inonzero = self.S > 1E-10
 					self.S = self.S[inonzero]
@@ -120,7 +120,7 @@ class LMM(object):
 				except la.LinAlgError:  # revert to Eigenvalue decomposition
 					print "Got SVD exception, trying eigenvalue decomposition of square of G. Note that this is a little bit less accurate"
 					[S,V] = la.eigh(PxG.T.dot(PxG))
-					if np.any(np.diagonal(S) < -0.1):
+					if np.any(S < -0.1):
 					    logging.warning("kernel contains a negative Eigenvalue")
 					inonzero = (S > 1E-10)
 					self.S = S[inonzero]

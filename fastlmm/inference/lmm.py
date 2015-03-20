@@ -138,7 +138,7 @@ class LMM(object):
                 #it is faster using the eigen decomposition of G.T*G but this is more accurate
                 try:
                     [U,S,V] = LA.svd(self.G,full_matrices = False)
-                    if np.any(np.diagonal(S) < -0.1):
+                    if np.any(S < -0.1):
                         logging.warning("kernel contains a negative Eigenvalue")
                     self.U = U
                     self.S = S*S
@@ -146,7 +146,7 @@ class LMM(object):
                 except LA.LinAlgError:  # revert to Eigenvalue decomposition
                     logging.warning("Got SVD exception, trying eigenvalue decomposition of square of G. Note that this is a little bit less accurate")
                     [S_,V_] = LA.eigh(self.G.T.dot(self.G))
-                    if np.any(np.diagonal(S_) < -0.1):
+                    if np.any(S_ < -0.1):
                         logging.warning("kernel contains a negative Eigenvalue")
                     S_nonz=(S_>0)
                     self.S = S_[S_nonz]
@@ -186,7 +186,7 @@ class LMM(object):
         else:
             self.K = (1.0-a2) * K0 + a2 * K1
         [S,U] = LA.eigh(self.K)
-        if np.any(np.diagonal(S) < -0.1):
+        if np.any(S < -0.1):
             logging.warning("kernel contains a negative Eigenvalue")
 
         self.U=U
