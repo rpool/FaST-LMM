@@ -80,6 +80,7 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="runner\PythonInstall.bat" />
+    <Content Include="stats\quadform\qfc_src\wrap_qfc.cpp" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.Common.targets" />
 </Project>

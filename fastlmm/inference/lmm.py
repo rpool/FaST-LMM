@@ -137,13 +137,13 @@ class LMM(object):
             if ((not self.forcefullrank) and (k<N)):
                 #it is faster using the eigen decomposition of G.T*G but this is more accurate
                 try:
-                    [U,S,V] = LA.svd(self.G,full_matrices = False)
+                    [U,S,V] = LA.svd(self.G,full_matrices = False) #!!!warn if any (diag) S element < -.1 that "kernel contains a negative Eigenvalue"
                     self.U = U
                     self.S = S*S
                 
                 except LA.LinAlgError:  # revert to Eigenvalue decomposition
                     logging.warning("Got SVD exception, trying eigenvalue decomposition of square of G. Note that this is a little bit less accurate")
-                    [S_,V_] = LA.eigh(self.G.T.dot(self.G))
+                    [S_,V_] = LA.eigh(self.G.T.dot(self.G)) #!!!warn if any (diag) S element < -.1 that "kernel contains a negative Eigenvalue"
                     S_nonz=(S_>0)
                     self.S = S_[S_nonz]
                     self.S*=(N/self.S.sum())
@@ -181,7 +181,7 @@ class LMM(object):
             self.K = K0
         else:
             self.K = (1.0-a2) * K0 + a2 * K1
-        [S,U] = LA.eigh(self.K)
+        [S,U] = LA.eigh(self.K) #!!!warn if any (diag) S element < -.1 that "kernel contains a negative Eigenvalue"
         self.U=U
         self.S=S#*(S.shape[0]/S.sum())
         self.a2 = a2
