@@ -6,8 +6,10 @@ FaST-LMM, which stands for Factored Spectrally Transformed Linear Mixed Models, 
 See the FaST-LMM website for related software:  
 http://research.microsoft.com/en-us/um/redmond/projects/MicrosoftGenomics/Fastlmm/
 
-For an annotated bibliography of all of our FaST-LMM and FaST-LMM-related papers, please see:  
-http://research.microsoft.com/en-us/um/redmond/projects/MicrosoftGenomics/Fastlmm/ab.htm
+For an annotated bibliography of all of our FaST-LMM and FaST-LMM-related papers, please see one of these two annotated bibliographies:  
+
+(a) http://research.microsoft.com/en-us/um/redmond/projects/MicrosoftGenomics/Fastlmm/ab.htm
+(b) http://research.microsoft.com/en-us/projects/fastlmm/
 
 Our documentation (including live examples) is also available as ipython notebook:
 http://nbviewer.ipython.org/github/MicrosoftGenomics/FaST-LMM/blob/master/doc/ipynb/FaST-LMM.ipynb
