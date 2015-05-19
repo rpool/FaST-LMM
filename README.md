@@ -9,6 +9,7 @@ http://research.microsoft.com/en-us/um/redmond/projects/MicrosoftGenomics/Fastlm
 For an annotated bibliography of all of our FaST-LMM and FaST-LMM-related papers, please see one of these two annotated bibliographies:  
 
 (a) http://research.microsoft.com/en-us/um/redmond/projects/MicrosoftGenomics/Fastlmm/ab.htm
+
 (b) http://research.microsoft.com/en-us/projects/fastlmm/
 
 Our documentation (including live examples) is also available as ipython notebook:
