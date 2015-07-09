@@ -1,4 +1,5 @@
 import fastlmm.inferece.lmm_cov as lmm_cov
+import numpy as np
 
 def est_h2(Y, K, covariates=None, nGridH2=10000, plot=True, verbose=True):
 	"""
@@ -13,7 +14,7 @@ def est_h2(Y, K, covariates=None, nGridH2=10000, plot=True, verbose=True):
 		covariates: 	[N x D] np.ndarray of covariate values [default: None]
 		plot:			Boolean, create a plot? [default: True]
 		verbose:		print results? [default: True]
-		
+
 	returns:
 		REML estimate of h^2 (as in Yang et al. 2010)
 		posterior mean of h^2
@@ -30,6 +31,7 @@ def est_h2(Y, K, covariates=None, nGridH2=10000, plot=True, verbose=True):
 	h2_mean = (np.exp(logp-logp.max())*grid[:,np.newaxis]).sum()/np.exp(logp-logp.max()).sum()
 	h2_var = (np.exp(logp-logp.max())*(grid[:,np.newaxis] - h2_mean)**2.0).sum()/np.exp(logp-logp.max()).sum()
 	if plot:
+		import pylab as plt
 		plt.figure()
 		plt.plot([h2['h2'],h2['h2']],[0,1],"r")
 		plt.plot([h2_mean,h2_mean],[0,1],"g")
