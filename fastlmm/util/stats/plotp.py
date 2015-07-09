@@ -650,7 +650,7 @@ def qqplot(pvals, fileout = None, alphalevel = 0.05,legend=None,xlim=None,ylim=N
         legendlist = [legend]
     
     if h1 is None:
-        h1=pl.figure(figsize) 
+        h1=pl.figure(figsize=figsize) 
     
     pl.grid(b=grid, alpha = 0.5)
          
