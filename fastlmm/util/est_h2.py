@@ -1,6 +1,6 @@
 import fastlmm.inferece.lmm_cov as lmm_cov
 
-def est_h2(Y, K, covariates=None, nGridH2=10000, plot=True, verbose=Trues):
+def est_h2(Y, K, covariates=None, nGridH2=10000, plot=True, verbose=True):
 	"""
 	This function implements the Bayesian heritability estimate from Furlotte et al., 2014
 
@@ -13,6 +13,7 @@ def est_h2(Y, K, covariates=None, nGridH2=10000, plot=True, verbose=Trues):
 		covariates: 	[N x D] np.ndarray of covariate values [default: None]
 		plot:			Boolean, create a plot? [default: True]
 		verbose:		print results? [default: True]
+		
 	returns:
 		REML estimate of h^2 (as in Yang et al. 2010)
 		posterior mean of h^2
