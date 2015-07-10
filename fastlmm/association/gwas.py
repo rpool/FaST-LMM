@@ -23,7 +23,7 @@ import scipy.stats as st
 import scipy.special as ss
 import pandas as pd
 from fastlmm.util.mingrid import *
-from util import *
+from fastlmm.util import *
 import time, os
 import ipdb
 from pysnptools.snpreader import Bed
