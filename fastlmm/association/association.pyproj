@@ -6,7 +6,7 @@
     <ProjectGuid>{52d85a6d-fd53-41e5-b7e2-6acc38373c98}</ProjectGuid>
     <ProjectHome>
     </ProjectHome>
-    <StartupFile>single_snp.py</StartupFile>
+    <StartupFile>tests\test_snp_set.py</StartupFile>
     <SearchPath>..\..;..\..\..\pysnptools</SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
     <OutputPath>.</OutputPath>
@@ -34,6 +34,10 @@
   <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
     <DebugSymbols>true</DebugSymbols>
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
+  </PropertyGroup>
+  <PropertyGroup>
+    <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
+    <PtvsTargetsFile>$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets</PtvsTargetsFile>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\..\doc\source\conf.py">
@@ -116,5 +120,6 @@
     <Folder Include="setup\" />
     <Folder Include="tests\" />
   </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.Common.targets" />
+  <Import Project="$(PtvsTargetsFile)" Condition="Exists($(PtvsTargetsFile))" />
+  <Import Project="$(MSBuildToolsPath)\Microsoft.Common.targets" Condition="!Exists($(PtvsTargetsFile))" />
 </Project>

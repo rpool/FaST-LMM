@@ -30,6 +30,10 @@
     <DebugSymbols>true</DebugSymbols>
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
+  <PropertyGroup>
+    <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
+    <PtvsTargetsFile>$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets</PtvsTargetsFile>
+  </PropertyGroup>
   <ItemGroup>
     <Compile Include="compute_auto_pcs.py">
       <SubType>Code</SubType>
@@ -82,5 +86,6 @@
     <Content Include="runner\PythonInstall.bat" />
     <Content Include="stats\quadform\qfc_src\wrap_qfc.cpp" />
   </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.Common.targets" />
+  <Import Project="$(PtvsTargetsFile)" Condition="Exists($(PtvsTargetsFile))" />
+  <Import Project="$(MSBuildToolsPath)\Microsoft.Common.targets" Condition="!Exists($(PtvsTargetsFile))" />
 </Project>

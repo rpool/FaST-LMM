@@ -7,7 +7,7 @@
     <ProjectHome>
     </ProjectHome>
     <StartupFile>test.py</StartupFile>
-    <SearchPath>..\..</SearchPath>
+    <SearchPath>..\..;..\..\..\pysnptools</SearchPath>
     <WorkingDirectory>
     </WorkingDirectory>
     <OutputPath>.</OutputPath>
@@ -26,6 +26,7 @@
     </CommandLineArguments>
     <InterpreterPath />
     <InterpreterArguments />
+    <EnableNativeCodeDebugging>False</EnableNativeCodeDebugging>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <DebugSymbols>true</DebugSymbols>
@@ -34,6 +35,10 @@
   <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
     <DebugSymbols>true</DebugSymbols>
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
+  </PropertyGroup>
+  <PropertyGroup>
+    <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
+    <PtvsTargetsFile>$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets</PtvsTargetsFile>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="feature_selection_cv.py" />
@@ -68,5 +73,6 @@
   <ItemGroup>
     <Folder Include="examples" />
   </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.Common.targets" />
+  <Import Project="$(PtvsTargetsFile)" Condition="Exists($(PtvsTargetsFile))" />
+  <Import Project="$(MSBuildToolsPath)\Microsoft.Common.targets" Condition="!Exists($(PtvsTargetsFile))" />
 </Project>

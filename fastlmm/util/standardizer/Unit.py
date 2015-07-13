@@ -14,31 +14,14 @@ class Unit(object):  #IStandardizer
         import fastlmm.util.standardizer as stdizer
         return stdizer.standardize_with_lambda(snps, l, blocksize)
 
+    @staticmethod
+    def _standardizer(snps,force_python_only):
+        from pysnptools.standardizer import Standardizer
+        Standardizer._standardize_unit_and_beta(snps, is_beta=False, a=float("NaN"), b=float("NaN"), apply_in_place=True, use_stats=False,stats=None,force_python_only=force_python_only)
+        return snps
 
     def lambdaFactory(self, snps, blocksize=None, force_python_only=False):
-        from pysnptools.snpreader import wrap_plink_parser
-        if not force_python_only:
-            if snps.dtype == np.float64:
-                if snps.flags['F_CONTIGUOUS'] and (snps.flags["OWNDATA"] or snps.base.nbytes == snps.nbytes):
-                    return lambda s : wrap_plink_parser.standardizedoubleFAAA(s,False,float("NaN"),float("NaN"))
-                elif snps.flags['C_CONTIGUOUS'] and (snps.flags["OWNDATA"] or snps.base.nbytes == snps.nbytes) and blocksize is None:
-                    return lambda s : wrap_plink_parser.standardizedoubleCAAA(s,False,float("NaN"),float("NaN"))
-                else:
-                    logging.info("Array is not contiguous, so will standarize with python only instead of C++")
-            elif snps.dtype == np.float32:
-                if snps.flags['F_CONTIGUOUS'] and (snps.flags["OWNDATA"] or snps.base.nbytes == snps.nbytes):
-                    return lambda s: wrap_plink_parser.standardizefloatFAAA(s,False,float("NaN"),float("NaN"))
-                elif snps.flags['C_CONTIGUOUS'] and (snps.flags["OWNDATA"] or snps.base.nbytes == snps.nbytes) and blocksize is None:
-                    return lambda s: wrap_plink_parser.standardizefloatCAAA(s,False,float("NaN"),float("NaN"))
-                else:
-                    logging.info("Array is not contiguous, so will standarize with python only instead of C++")
-            else:
-                logging.info("Array type is not float64 or float32, so will standarize with python only instead of C++")
-
-        import fastlmm.util.standardizer as stdizer
-        return lambda s, stdizer=stdizer: stdizer.standardize_unit_python(s)
-
-
+        return lambda s,force_python_only=force_python_only:self._standardizer(snps,force_python_only)
 
     def __str__(self):
         return "{0}()".format(self.__class__.__name__)

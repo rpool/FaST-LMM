@@ -195,7 +195,7 @@ class FastLmmSet: # implements IDistributable
         if self.altset_list2 is None: #singleton sets            
             for iset, altset in enumerate(self.altsetlist_filtbysnps):
                 for iperm in xrange(-1, self.nperm):   #note that self.nperm is the 'stop', not the 'count'
-                    SNPsalt=altset.read()    
+                    SNPsalt=altset.read()
                     SNPsalt['snps'] = util.standardize(SNPsalt['snps'])
                     G1 = SNPsalt['snps']/sp.sqrt(SNPsalt['snps'].shape[1])  
                     ichrm =  ",".join(sp.array(sp.unique(SNPsalt['pos'][:,0]),dtype=str)) 
