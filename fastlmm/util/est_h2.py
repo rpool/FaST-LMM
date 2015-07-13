@@ -37,7 +37,6 @@ def est_h2(Y, K, covariates=None, nGridH2=10000, plot=True, verbose=True):
 		plt.plot([h2_mean,h2_mean],[0,1],"g")
 		plt.legend(["REML-estimate = %.3f"%h2['h2'],"posterior mean = %.3f"%h2_mean])
 		plt.plot(grid.flatten(),post_h2.flatten())
-		plt.title(col)
 		plt.xlabel("$h^2$")
 		plt.ylabel("$p( h^2 | Data)$")
 	if verbose:
