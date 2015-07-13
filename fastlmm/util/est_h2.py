@@ -22,7 +22,7 @@ def est_h2(Y, K, covariates=None, nGridH2=10000, plot=True, verbose=True):
 		h2 values on a grid
 		posterior for h2 values on a grid
 	"""
-	lmm = lmm_cov.LMM(forcefullrank=False, X=X, linreg=None, Y=Y, G=None, K=K, regressX=True, inplace=False)
+	lmm = lmm_cov.LMM(forcefullrank=False, X=covariates, linreg=None, Y=Y, G=None, K=K, regressX=True, inplace=False)
 	h2 = lmm.findH2()
 	h2_posterior = lmm.posterior_h2(nGridH2=nGridH2)
 	logp = -h2_posterior[2]
