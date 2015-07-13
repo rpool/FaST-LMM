@@ -453,6 +453,39 @@ class LMM(object):
 			#logging.info("search\t{0}\t{1}".format("?",resmin[0]))
 			return resmin[0]
 
+	def posterior_h2(self, nGridH2=1000, minH2=0.0, maxH2=0.99999, **kwargs):
+		'''
+		Find the optimal h2 for a given K. Note that this is the single kernel case. So there is no a2.
+		(default maxH2 value is set to a value smaller than 1 to avoid loss of positive definiteness of the final model covariance)
+		Args:
+			nGridH2 : number of h2-grid points to evaluate the negative log-likelihood at. Number of columns in design matrix for kernel for normalization (default: 10)
+			minH2   : minimum value for h2 optimization (default: 0.0)
+			maxH2   : maximum value for h2 optimization (default: 0.99999)
+			estimate_Bayes: implement me!   (default: False)
+
+		Returns:
+			dictionary containing the model parameters at the optimal h2
+		'''
+		#f = lambda x : (self.nLLeval(h2=x,**kwargs)['nLL'])
+		resmin = [None]
+		#logging.info("starting H2 search")
+		assert self.Y.shape[1] == 1, "only works for single phenotype"
+		def f(x):
+			res = self.nLLeval(h2=x,**kwargs)
+			#check all results for local minimum:
+			if (resmin[0] is None):
+					resmin[0] = {'nLL':res['nLL'],'h2':np.zeros_like(res['nLL'])+res['h2']}
+			else:
+				for i in xrange(self.Y.shape[1]):
+					if (res['nLL'][i] < resmin[0]['nLL'][i]):
+						resmin[0]['nLL'][i] = res['nLL'][i]
+						resmin[0]['h2'][i] = res['h2']
+			#logging.info("search\t{0}\t{1}".format(x,res['nLL']))
+			return res['nLL']
+		(evalgrid,resultgrid) = evalgrid1D(f, evalgrid = None, nGrid=nGridH2, minval=minH2, maxval = maxH2, dimF=self.Y.shape[1])
+		#import ipdb;ipdb.set_trace()
+		return resmin[0], evalgrid, resultgrid
+
 	def nLLeval_2K(self, h2=0.0, h2_1=0.0, dof=None, scale=1.0, penalty=0.0, snps=None, UW=None, UUW=None, i_up=None, i_G1=None, subset=False):
 		'''
 		TODO: rename to nLLeval
@@ -503,7 +536,6 @@ class LMM(object):
 		'''
 
 		N = self.Y.shape[0] - self.linreg.D
-        
 		P = self.Y.shape[1]
 		S,U = self.getSU()
 		k = S.shape[0]
