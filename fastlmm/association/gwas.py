@@ -228,13 +228,6 @@ class GWAS(object):
 		return pheno_input
 
 if __name__ == "__main__":
-	import logging
-	from pysnptools.snpreader import Bed
-	import pysnptools.standardizer
-	import pysnptools
-	import pysnptools.util
-	import pysnptools.util.pheno
-	import time
 
 	bed_fn = "../../test/data/plinkdata/toydata"
 	pheno_fn = bed_fn + ".phe6"#"../../test/data/plinkdata/toydata.phe"
@@ -253,7 +246,7 @@ if __name__ == "__main__":
 	covariates = GWAS._pheno_fixup(covariate_fn, iid_source_if_none=pheno)
 	print "intersecting data"
 	t00 = time.time()
-	snp_intersect,pheno_intersect = pysnptools.util.intersect_apply([snp_reader, pheno], sort_by_dataset=True)
+	snp_intersect, pheno_intersect = pysnptools.util.intersect_apply([snp_reader, pheno], sort_by_dataset=True)
 	t1 = time.time()
 	print "done intersecting after %.4fs" % (t1-t00)
 

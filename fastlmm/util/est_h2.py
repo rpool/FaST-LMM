@@ -1,4 +1,4 @@
-import fastlmm.inferece.lmm_cov as lmm_cov
+import fastlmm.inference.lmm_cov as lmm_cov
 import numpy as np
 
 def est_h2(Y, K, covariates=None, nGridH2=10000, plot=True, verbose=True):
