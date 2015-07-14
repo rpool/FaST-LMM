@@ -127,7 +127,7 @@ def single_snp(test_snps,pheno,
 def single_snp_leave_out_one_chrom(test_snps, pheno,
                  G1=None, mixing=0.0, #!!test mixing and G1
                  covar=None,covar_by_chrom=None,
-                 h2=None, log_delta=None, output_file_name=None):
+                 h2=None, log_delta=None, output_file_name=None, interact_with_snp=None):
     """
     Function performing single SNP GWAS via cross validation over the chromosomes with REML
 
@@ -167,7 +167,9 @@ def single_snp_leave_out_one_chrom(test_snps, pheno,
     :param log_delta: a re-parameterization of h2 provided for backwards compatibility.
     :type log_delta: number
 
-
+    :param interact_with_snp: index of a covariate to perform an interaction test with. 
+            Allows for interaction testing (interact_with_snp x snp will be tested)
+            default: None
     :rtype: Pandas dataframe with one row per test SNP. Columns include "PValue"
 
     :Example:
@@ -204,7 +206,7 @@ def single_snp_leave_out_one_chrom(test_snps, pheno,
 
         frame_chrom = _internal_single(G0_standardized=G0_standardized_chrom, test_snps=test_snps_chrom, pheno=pheno,
                                 covar=covar_chrom, G1_standardized=G1_standardized_chrom, mixing=mixing,
-                                h2=h2, log_delta=log_delta, cache_file=None)
+                                h2=h2, log_delta=log_delta, cache_file=None, interact_with_snp=interact_with_snp)
 
         frame_list.append(frame_chrom)
 
@@ -241,7 +243,7 @@ def _find_mixing(G, covar, G0_standardized_val, G1_standardized_val, h2, y):
 def _internal_single(G0_standardized, test_snps, pheno,covar, G1_standardized,
                  mixing, #!!test mixing and G1
                  h2, log_delta,
-                 cache_file):
+                 cache_file, interact_with_snp=None):
 
     assert h2 is None or log_delta is None, "if h2 is specified, log_delta may not be specified"
     if log_delta is not None:
@@ -284,7 +286,16 @@ def _internal_single(G0_standardized, test_snps, pheno,covar, G1_standardized,
     logging.info("h2={0}".format(h2))
 
     snps_read = test_snps.read().standardize()
-    res = lmm.nLLeval(h2=h2, dof=None, scale=1.0, penalty=0.0, snps=snps_read.val)
+    
+    if interact_with_snp is not None:
+        print "interaction with %i" % interact_with_snp
+        interact = covar[:,interact_with_snp]
+        interact -=interact.mean()
+        interact /= interact.std()
+        variables_to_test = snps_read.val * interact[:,np.newaxis]
+    else:
+        variables_to_test = snps_read.val
+    res = lmm.nLLeval(h2=h2, dof=None, scale=1.0, penalty=0.0, snps=variables_to_test)
 
     if cache_file is not None and not os.path.exists(cache_file):
         pstutil.create_directory_if_necessary(cache_file)
