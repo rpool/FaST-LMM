@@ -5,6 +5,8 @@ import pdb
 import warnings
 import logging
 import sys
+import matplotlib
+matplotlib.use('Agg') #This lets it work even on machines without graphics displays
 import matplotlib.pyplot as plt
 
 def thin_results_file(myfile,dup_postfix="v2"):
