@@ -8,7 +8,7 @@
     
     <title>fastlmm API Documentation &mdash; fastlmm 0.0.1 documentation</title>
     
-    <link rel="stylesheet" href="_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="_static/classic.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
     
     <script type="text/javascript">
@@ -25,24 +25,24 @@
     <script type="text/javascript" src="_static/doctools.js"></script>
     <link rel="top" title="fastlmm 0.0.1 documentation" href="#" /> 
   </head>
-  <body>
-    <div class="related">
+  <body role="document">
+    <div class="related" role="navigation" aria-label="related navigation">
       <h3>Navigation</h3>
       <ul>
         <li class="right" style="margin-right: 10px">
           <a href="genindex.html" title="General Index"
              accesskey="I">index</a></li>
-        <li><a href="#">fastlmm 0.0.1 documentation</a> &raquo;</li> 
+        <li class="nav-item nav-item-0"><a href="#">fastlmm 0.0.1 documentation</a> &raquo;</li> 
       </ul>
     </div>  
 
     <div class="document">
       <div class="documentwrapper">
         <div class="bodywrapper">
-          <div class="body">
+          <div class="body" role="main">
             
   <div class="section" id="fastlmm-api-documentation">
-<h1><tt class="xref py py-mod docutils literal"><span class="pre">fastlmm</span></tt> API Documentation<a class="headerlink" href="#fastlmm-api-documentation" title="Permalink to this headline">¶</a></h1>
+<h1><code class="xref py py-mod docutils literal"><span class="pre">fastlmm</span></code> API Documentation<a class="headerlink" href="#fastlmm-api-documentation" title="Permalink to this headline">¶</a></h1>
 <p>FaST-LMM, which stands for Factored Spectrally Transformed Linear Mixed Models, is a program for performing both
 single-SNP and SNP-set genome-wide association studies (GWAS) on extremely large data sets.
 This release contains the improvements described in Widmer <em>et al.</em>, <em>Scientific Reports</em> 2014, and tests for epistasis.</p>
@@ -51,22 +51,22 @@ This release contains the improvements described in Widmer <em>et al.</em>, <em>
 <p>Our main documentation (including live examples) is also available as ipython notebook:
 <a class="reference external" href="http://nbviewer.ipython.org/github/MicrosoftGenomics/FaST-LMM/blob/master/doc/ipynb/FaST-LMM.ipynb">http://nbviewer.ipython.org/github/MicrosoftGenomics/FaST-LMM/blob/master/doc/ipynb/FaST-LMM.ipynb</a></p>
 <div class="section" id="single-snp">
-<h2><tt class="xref py py-mod docutils literal"><span class="pre">single_snp</span></tt><a class="headerlink" href="#single-snp" title="Permalink to this headline">¶</a></h2>
+<h2><code class="xref py py-mod docutils literal"><span class="pre">single_snp</span></code><a class="headerlink" href="#single-snp" title="Permalink to this headline">¶</a></h2>
 <dl class="function">
 <dt id="fastlmm.association.single_snp">
-<tt class="descclassname">fastlmm.association.</tt><tt class="descname">single_snp</tt><big>(</big><em>test_snps</em>, <em>pheno</em>, <em>G0=None</em>, <em>G1=None</em>, <em>mixing=None</em>, <em>covar=None</em>, <em>output_file_name=None</em>, <em>h2=None</em>, <em>log_delta=None</em>, <em>cache_file=None</em><big>)</big><a class="headerlink" href="#fastlmm.association.single_snp" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">fastlmm.association.</code><code class="descname">single_snp</code><span class="sig-paren">(</span><em>test_snps</em>, <em>pheno</em>, <em>G0=None</em>, <em>G1=None</em>, <em>mixing=None</em>, <em>covar=None</em>, <em>output_file_name=None</em>, <em>h2=None</em>, <em>log_delta=None</em>, <em>cache_file=None</em><span class="sig-paren">)</span><a class="headerlink" href="#fastlmm.association.single_snp" title="Permalink to this definition">¶</a></dt>
 <dd><p>Function performing single SNP GWAS with REML</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>test_snps</strong> (a <tt class="xref py py-class docutils literal"><span class="pre">SnpReader</span></tt> or a string) &#8211; SNPs to test. If you give a string, it should be the base name of a set of PLINK Bed-formatted files.</li>
+<li><strong>test_snps</strong> (a <code class="xref py py-class docutils literal"><span class="pre">SnpReader</span></code> or a string) &#8211; SNPs to test. If you give a string, it should be the base name of a set of PLINK Bed-formatted files.</li>
 <li><strong>pheno</strong> (<em>a &#8216;pheno dictionary&#8217; or a string</em>) &#8211; A single phenotype: A &#8216;pheno dictionary&#8217; contains an ndarray on the &#8216;vals&#8217; key and a iid list on the &#8216;iid&#8217; key.
 If you give a string, it should be the file name of a PLINK phenotype-formatted file.</li>
-<li><strong>G0</strong> (a <tt class="xref py py-class docutils literal"><span class="pre">SnpReader</span></tt> or a string) &#8211; SNPs from which to construct a similarity matrix.
+<li><strong>G0</strong> (a <code class="xref py py-class docutils literal"><span class="pre">SnpReader</span></code> or a string) &#8211; SNPs from which to construct a similarity matrix.
 If you give a string, it should be the base name of a set of PLINK Bed-formatted files.</li>
-<li><strong>G1</strong> (a <tt class="xref py py-class docutils literal"><span class="pre">SnpReader</span></tt> or a string) &#8211; SNPs from which to construct a second similarity kernel, optional. Also, see &#8216;mixing&#8217;).
+<li><strong>G1</strong> (a <code class="xref py py-class docutils literal"><span class="pre">SnpReader</span></code> or a string) &#8211; SNPs from which to construct a second similarity kernel, optional. Also, see &#8216;mixing&#8217;).
 If you give a string, it should be the base name of a set of PLINK Bed-formatted files.</li>
 <li><strong>mixing</strong> (<em>number</em>) &#8211; Weight between 0.0 (inclusive, default) and 1.0 (inclusive) given to G1 relative to G0.
 If you give no mixing number and a G1 is given, the best weight will be learned.</li>
@@ -110,21 +110,21 @@ If given and the file does exist then G0 and G1 need not be given.</li>
 
 </div>
 <div class="section" id="single-snp-leave-out-one-chrom">
-<h2><tt class="xref py py-mod docutils literal"><span class="pre">single_snp_leave_out_one_chrom</span></tt><a class="headerlink" href="#single-snp-leave-out-one-chrom" title="Permalink to this headline">¶</a></h2>
+<h2><code class="xref py py-mod docutils literal"><span class="pre">single_snp_leave_out_one_chrom</span></code><a class="headerlink" href="#single-snp-leave-out-one-chrom" title="Permalink to this headline">¶</a></h2>
 <dl class="function">
 <dt id="fastlmm.association.single_snp_leave_out_one_chrom">
-<tt class="descclassname">fastlmm.association.</tt><tt class="descname">single_snp_leave_out_one_chrom</tt><big>(</big><em>test_snps</em>, <em>pheno</em>, <em>G1=None</em>, <em>mixing=0.0</em>, <em>covar=None</em>, <em>covar_by_chrom=None</em>, <em>h2=None</em>, <em>log_delta=None</em>, <em>output_file_name=None</em><big>)</big><a class="headerlink" href="#fastlmm.association.single_snp_leave_out_one_chrom" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">fastlmm.association.</code><code class="descname">single_snp_leave_out_one_chrom</code><span class="sig-paren">(</span><em>test_snps</em>, <em>pheno</em>, <em>G1=None</em>, <em>mixing=0.0</em>, <em>covar=None</em>, <em>covar_by_chrom=None</em>, <em>h2=None</em>, <em>log_delta=None</em>, <em>output_file_name=None</em>, <em>interact_with_snp=None</em><span class="sig-paren">)</span><a class="headerlink" href="#fastlmm.association.single_snp_leave_out_one_chrom" title="Permalink to this definition">¶</a></dt>
 <dd><p>Function performing single SNP GWAS via cross validation over the chromosomes with REML</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>test_snps</strong> (a <tt class="xref py py-class docutils literal"><span class="pre">SnpReader</span></tt> or a string) &#8211; SNPs to test and to construct similarity matrix.
+<li><strong>test_snps</strong> (a <code class="xref py py-class docutils literal"><span class="pre">SnpReader</span></code> or a string) &#8211; SNPs to test and to construct similarity matrix.
 If you give a string, it should be the base name of a set of PLINK Bed-formatted files.</li>
 <li><strong>pheno</strong> (<em>a &#8216;pheno dictionary&#8217; or a string</em>) &#8211; A single phenotype: A &#8216;pheno dictionary&#8217; contains an ndarray on the &#8216;vals&#8217; key and a iid list on the &#8216;iid&#8217; key.
 If you give a string, it should be the file name of a PLINK phenotype-formatted file.</li>
-<li><strong>G1</strong> (a <tt class="xref py py-class docutils literal"><span class="pre">SnpReader</span></tt> or a string) &#8211; SNPs from which to construct a second simalirty matrix, optional. Also, see &#8216;mixing&#8217;).
+<li><strong>G1</strong> (a <code class="xref py py-class docutils literal"><span class="pre">SnpReader</span></code> or a string) &#8211; SNPs from which to construct a second simalirty matrix, optional. Also, see &#8216;mixing&#8217;).
 If you give a string, it should be the base name of a set of PLINK Bed-formatted files.</li>
 <li><strong>mixing</strong> (<em>number</em>) &#8211; Weight between 0.0 (inclusive, default) and 1.0 (inclusive) given to G1 relative to G0.
 If you give no mixing number, G0 will get all the weight and G1 will be ignored.</li>
@@ -137,6 +137,9 @@ It is a dictionary from chromosome number to a &#8216;pheno dictionary&#8217; or
 If not given will search for best value.
 If mixing is unspecified, then h2 must also be unspecified.</li>
 <li><strong>log_delta</strong> (<em>number</em>) &#8211; a re-parameterization of h2 provided for backwards compatibility.</li>
+<li><strong>interact_with_snp</strong> &#8211; index of a covariate to perform an interaction test with. 
+Allows for interaction testing (interact_with_snp x snp will be tested)
+default: None</li>
 </ul>
 </td>
 </tr>
@@ -162,22 +165,22 @@ If mixing is unspecified, then h2 must also be unspecified.</li>
 
 </div>
 <div class="section" id="epistasis">
-<h2><tt class="xref py py-mod docutils literal"><span class="pre">epistasis</span></tt><a class="headerlink" href="#epistasis" title="Permalink to this headline">¶</a></h2>
+<h2><code class="xref py py-mod docutils literal"><span class="pre">epistasis</span></code><a class="headerlink" href="#epistasis" title="Permalink to this headline">¶</a></h2>
 <dl class="function">
 <dt id="fastlmm.association.epistasis">
-<tt class="descclassname">fastlmm.association.</tt><tt class="descname">epistasis</tt><big>(</big><em>test_snps</em>, <em>pheno</em>, <em>G0</em>, <em>G1=None</em>, <em>mixing=0.0</em>, <em>covar=None</em>, <em>output_file_name=None</em>, <em>sid_list_0=None</em>, <em>sid_list_1=None</em>, <em>log_delta=None</em>, <em>min_log_delta=-5</em>, <em>max_log_delta=10</em>, <em>cache_file=None</em>, <em>runner=None</em><big>)</big><a class="headerlink" href="#fastlmm.association.epistasis" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">fastlmm.association.</code><code class="descname">epistasis</code><span class="sig-paren">(</span><em>test_snps</em>, <em>pheno</em>, <em>G0</em>, <em>G1=None</em>, <em>mixing=0.0</em>, <em>covar=None</em>, <em>output_file_name=None</em>, <em>sid_list_0=None</em>, <em>sid_list_1=None</em>, <em>log_delta=None</em>, <em>min_log_delta=-5</em>, <em>max_log_delta=10</em>, <em>cache_file=None</em>, <em>runner=None</em><span class="sig-paren">)</span><a class="headerlink" href="#fastlmm.association.epistasis" title="Permalink to this definition">¶</a></dt>
 <dd><p>Function performing epistasis GWAS with ML (never REML).  See <a class="reference external" href="http://www.nature.com/srep/2013/130122/srep01099/full/srep01099.html">http://www.nature.com/srep/2013/130122/srep01099/full/srep01099.html</a>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>test_snps</strong> (a <tt class="xref py py-class docutils literal"><span class="pre">SnpReader</span></tt> or a string) &#8211; SNPs from which to test pairs. If you give a string, it should be the base name of a set of PLINK Bed-formatted files.</li>
+<li><strong>test_snps</strong> (a <code class="xref py py-class docutils literal"><span class="pre">SnpReader</span></code> or a string) &#8211; SNPs from which to test pairs. If you give a string, it should be the base name of a set of PLINK Bed-formatted files.</li>
 <li><strong>pheno</strong> (<em>a &#8216;pheno dictionary&#8217; or a string</em>) &#8211; A single phenotype: A &#8216;pheno dictionary&#8217; contains an ndarray on the &#8216;vals&#8217; key and a iid list on the &#8216;iid&#8217; key.
 If you give a string, it should be the file name of a PLINK phenotype-formatted file.</li>
-<li><strong>G0</strong> (a <tt class="xref py py-class docutils literal"><span class="pre">SnpReader</span></tt> or a string) &#8211; SNPs from which to construct a similarity matrix.
+<li><strong>G0</strong> (a <code class="xref py py-class docutils literal"><span class="pre">SnpReader</span></code> or a string) &#8211; SNPs from which to construct a similarity matrix.
 If you give a string, it should be the base name of a set of PLINK Bed-formatted files.</li>
-<li><strong>G1</strong> (a <tt class="xref py py-class docutils literal"><span class="pre">SnpReader</span></tt> or a string) &#8211; SNPs from which to construct a second similarity kernel, optional. Also, see &#8216;mixing&#8217;).
+<li><strong>G1</strong> (a <code class="xref py py-class docutils literal"><span class="pre">SnpReader</span></code> or a string) &#8211; SNPs from which to construct a second similarity kernel, optional. Also, see &#8216;mixing&#8217;).
 If you give a string, it should be the base name of a set of PLINK Bed-formatted files.</li>
 <li><strong>mixing</strong> (<em>number</em>) &#8211; Weight between 0.0 (inclusive, default) and 1.1 (inclusive) given to G1 relative to G0.
 If you give no mixing number, G0 will get all the weight and G1 will be ignored.</li>
@@ -232,10 +235,10 @@ If not given, the function is run locally.</li>
 
 </div>
 <div class="section" id="snp-set">
-<h2><tt class="xref py py-mod docutils literal"><span class="pre">snp_set</span></tt><a class="headerlink" href="#snp-set" title="Permalink to this headline">¶</a></h2>
+<h2><code class="xref py py-mod docutils literal"><span class="pre">snp_set</span></code><a class="headerlink" href="#snp-set" title="Permalink to this headline">¶</a></h2>
 <dl class="function">
 <dt id="fastlmm.association.snp_set">
-<tt class="descclassname">fastlmm.association.</tt><tt class="descname">snp_set</tt><big>(</big><em>test_snps</em>, <em>set_list</em>, <em>pheno</em>, <em>covar=None</em>, <em>output_file_name=None</em>, <em>G0=None</em>, <em>test='lrt'</em>, <em>write_lrtperm=False</em>, <em>nperm=10</em>, <em>npermabs=None</em>, <em>mpheno=1</em>, <em>G0_fit='qq'</em>, <em>qmax=0.1</em>, <em>seed=None</em>, <em>minsetsize=None</em>, <em>maxsetsize=None</em>, <em>mindist=0</em>, <em>idist=1</em><big>)</big><a class="headerlink" href="#fastlmm.association.snp_set" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">fastlmm.association.</code><code class="descname">snp_set</code><span class="sig-paren">(</span><em>test_snps</em>, <em>set_list</em>, <em>pheno</em>, <em>covar=None</em>, <em>output_file_name=None</em>, <em>G0=None</em>, <em>test='lrt'</em>, <em>write_lrtperm=False</em>, <em>nperm=10</em>, <em>npermabs=None</em>, <em>mpheno=1</em>, <em>G0_fit='qq'</em>, <em>qmax=0.1</em>, <em>seed=None</em>, <em>minsetsize=None</em>, <em>maxsetsize=None</em>, <em>mindist=0</em>, <em>idist=1</em><span class="sig-paren">)</span><a class="headerlink" href="#fastlmm.association.snp_set" title="Permalink to this definition">¶</a></dt>
 <dd><p>Function performing GWAS on sets of snps</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -287,17 +290,17 @@ If not given, the function is run locally.</li>
 
 </div>
 <div class="section" id="compute-auto-pcs">
-<h2><tt class="xref py py-mod docutils literal"><span class="pre">compute_auto_pcs</span></tt><a class="headerlink" href="#compute-auto-pcs" title="Permalink to this headline">¶</a></h2>
+<h2><code class="xref py py-mod docutils literal"><span class="pre">compute_auto_pcs</span></code><a class="headerlink" href="#compute-auto-pcs" title="Permalink to this headline">¶</a></h2>
 <dl class="function">
 <dt id="fastlmm.util.compute_auto_pcs">
-<tt class="descclassname">fastlmm.util.</tt><tt class="descname">compute_auto_pcs</tt><big>(</big><em>snpreader</em>, <em>cutoff=0.1</em>, <em>k_values=array([ 0</em>, <em>1</em>, <em>2</em>, <em>3</em>, <em>4</em>, <em>5</em>, <em>6</em>, <em>7</em>, <em>8</em>, <em>9</em>, <em>10])</em>, <em>output_file_name=None</em><big>)</big><a class="headerlink" href="#fastlmm.util.compute_auto_pcs" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">fastlmm.util.</code><code class="descname">compute_auto_pcs</code><span class="sig-paren">(</span><em>snpreader</em>, <em>cutoff=0.1</em>, <em>k_values=array([ 0</em>, <em>1</em>, <em>2</em>, <em>3</em>, <em>4</em>, <em>5</em>, <em>6</em>, <em>7</em>, <em>8</em>, <em>9</em>, <em>10])</em>, <em>output_file_name=None</em><span class="sig-paren">)</span><a class="headerlink" href="#fastlmm.util.compute_auto_pcs" title="Permalink to this definition">¶</a></dt>
 <dd><p>Function automatically finds the best principle components (PCs)</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>snpreader</strong> (a <tt class="xref py py-class docutils literal"><span class="pre">SnpReader</span></tt> or a string) &#8211; SNPs for which to find the best PCs
+<li><strong>snpreader</strong> (a <code class="xref py py-class docutils literal"><span class="pre">SnpReader</span></code> or a string) &#8211; SNPs for which to find the best PCs
 If you give a string, it should be the base name of a set of PLINK Bed-formatted files.</li>
 <li><strong>cutoff</strong> (<em>a number between 0 and 1.</em>) &#8211; (default: .1) The degree of relatedness to remove before finding the best number of PCs.
 Relatedness is measured with a RRM (realized relationship matrix) so 0 is no relation, .5 is a sibling or parent, and 1 is self or twin.</li>
@@ -328,9 +331,9 @@ Relatedness is measured with a RRM (realized relationship matrix) so 0 is no rel
 <h2>Indices and Tables<a class="headerlink" href="#indices-and-tables" title="Permalink to this headline">¶</a></h2>
 <blockquote>
 <div><ul class="simple">
-<li><a class="reference internal" href="genindex.html"><em>Index</em></a></li>
-<li><a class="reference internal" href="py-modindex.html"><em>Module Index</em></a></li>
-<li><a class="reference internal" href="search.html"><em>Search Page</em></a></li>
+<li><a class="reference internal" href="genindex.html"><span>Index</span></a></li>
+<li><a class="reference internal" href="py-modindex.html"><span>Module Index</span></a></li>
+<li><a class="reference internal" href="search.html"><span>Search Page</span></a></li>
 </ul>
 </div></blockquote>
 </div>
@@ -340,27 +343,29 @@ Relatedness is measured with a RRM (realized relationship matrix) so 0 is no rel
           </div>
         </div>
       </div>
-      <div class="sphinxsidebar">
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
         <div class="sphinxsidebarwrapper">
   <h3><a href="#">Table Of Contents</a></h3>
   <ul>
-<li><a class="reference internal" href="#"><tt class="docutils literal"><span class="pre">fastlmm</span></tt> API Documentation</a><ul>
-<li><a class="reference internal" href="#single-snp"><tt class="docutils literal"><span class="pre">single_snp</span></tt></a></li>
-<li><a class="reference internal" href="#single-snp-leave-out-one-chrom"><tt class="docutils literal"><span class="pre">single_snp_leave_out_one_chrom</span></tt></a></li>
-<li><a class="reference internal" href="#epistasis"><tt class="docutils literal"><span class="pre">epistasis</span></tt></a></li>
-<li><a class="reference internal" href="#snp-set"><tt class="docutils literal"><span class="pre">snp_set</span></tt></a></li>
-<li><a class="reference internal" href="#compute-auto-pcs"><tt class="docutils literal"><span class="pre">compute_auto_pcs</span></tt></a></li>
+<li><a class="reference internal" href="#"><code class="docutils literal"><span class="pre">fastlmm</span></code> API Documentation</a><ul>
+<li><a class="reference internal" href="#single-snp"><code class="docutils literal"><span class="pre">single_snp</span></code></a></li>
+<li><a class="reference internal" href="#single-snp-leave-out-one-chrom"><code class="docutils literal"><span class="pre">single_snp_leave_out_one_chrom</span></code></a></li>
+<li><a class="reference internal" href="#epistasis"><code class="docutils literal"><span class="pre">epistasis</span></code></a></li>
+<li><a class="reference internal" href="#snp-set"><code class="docutils literal"><span class="pre">snp_set</span></code></a></li>
+<li><a class="reference internal" href="#compute-auto-pcs"><code class="docutils literal"><span class="pre">compute_auto_pcs</span></code></a></li>
 <li><a class="reference internal" href="#indices-and-tables">Indices and Tables</a></li>
 </ul>
 </li>
 </ul>
 
-  <h3>This Page</h3>
-  <ul class="this-page-menu">
-    <li><a href="_sources/index.txt"
-           rel="nofollow">Show Source</a></li>
-  </ul>
-<div id="searchbox" style="display: none">
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/index.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
   <h3>Quick search</h3>
     <form class="search" action="search.html" method="get">
       <input type="text" name="q" />
@@ -377,18 +382,18 @@ Relatedness is measured with a RRM (realized relationship matrix) so 0 is no rel
       </div>
       <div class="clearer"></div>
     </div>
-    <div class="related">
+    <div class="related" role="navigation" aria-label="related navigation">
       <h3>Navigation</h3>
       <ul>
         <li class="right" style="margin-right: 10px">
           <a href="genindex.html" title="General Index"
              >index</a></li>
-        <li><a href="#">fastlmm 0.0.1 documentation</a> &raquo;</li> 
+        <li class="nav-item nav-item-0"><a href="#">fastlmm 0.0.1 documentation</a> &raquo;</li> 
       </ul>
     </div>
-    <div class="footer">
+    <div class="footer" role="contentinfo">
         &copy; Copyright .
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.2.2.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.3.1.
     </div>
   </body>
 </html>

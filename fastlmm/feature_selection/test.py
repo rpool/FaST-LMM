@@ -508,7 +508,7 @@ def getTestSuite():
     """
     suite1 = unittest.TestLoader().loadTestsFromTestCase(TestTwoKernelFeatureSelection)
     suite2 = unittest.TestLoader().loadTestsFromTestCase(TestFeatureSelection)
-    return unittest.TestSuite([suite2])  #!!!cmk suite1,
+    return unittest.TestSuite([suite1,suite2])
 
 
 if __name__ == '__main__':
