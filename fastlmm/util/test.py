@@ -63,5 +63,3 @@ if __name__ == '__main__':
     r = unittest.TextTestRunner(failfast=False)
     r.run(suites)
     print "done"
-
-

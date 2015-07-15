@@ -49,7 +49,6 @@ def compare_files(file1,file2,tol=1e-8,delimiter="\t"):
     except:
         #file contains just a single column.
         return sp.all(dat1==dat2), "single column result doesn't match exactly ('{0}')".format(file1)
-
     #logging.warn("DO headers match up? (file='{0}', '{1}' =?= '{2}')".format(file1, head1,head2))
     if not sp.all(head1==head2):         
         return False, "headers do not match up (file='{0}', '{1}' =?= '{2}')".format(file1, head1,head2)
@@ -80,6 +79,41 @@ def compare_files(file1,file2,tol=1e-8,delimiter="\t"):
         
     return True, "files are comparable within abs tolerance=%e" % tol
     
+def compare_mixed_files(file1,file2,tol=1e-8,delimiter="\t"):
+    '''
+    Given two files, compare the contents, including numbers up to absolute tolerance, tol
+    Returns: val,msg 
+    where val is True/False (true means files to compare to each other) and a msg for the failure.
+    '''
+    dat1=sp.loadtxt(file1,dtype='str',delimiter=delimiter,comments=None)
+    dat2=sp.loadtxt(file2,dtype='str',delimiter=delimiter,comments=None)
+
+    ncol1=dat1[0].size
+    ncol2=dat2[0].size
+
+    if ncol1!=ncol2:         
+        return False,"num columns do not match up"
+
+    try:
+        r_count = dat1.shape[0]
+        c_count = dat1.shape[1]
+    except:
+        #file contains just a single column.
+        return sp.all(dat1==dat2), "single column result doesn't match exactly ('{0}')".format(file1)
+
+    for r in xrange(r_count):
+        for c in xrange(c_count):
+            val1 = dat1[r,c]
+            val2 = dat2[r,c]
+            if val1!=val2:
+                try:
+                    f1 = float(val1)
+                    f2 = float(val2)
+                except:
+                    return False, "Values do not match up (file='{0}', '{1}' =?= '{2}')".format(file1, val1, val2)
+                if abs(f1-f2) > tol:
+                    return False, "Values too different (file='{0}', '{1}' =?= '{2}')".format(file1, val1, val2)
+    return True, "files are comparable within abs tolerance=%e" % tol
 
 #could make this more efficient by reading in blocks of SNPs, as in 
 #FastLmmSet.py:KfromAltSnps()
@@ -449,7 +483,7 @@ def manhattan_plot(chr_pos_pvalue_array,pvalue_line=None,plot_threshold=1.0,vlin
     >>> import fastlmm.util.util as flutil
     >>> pheno_fn = "../feature_selection/examples/toydata.phe"
     >>> results_dataframe = single_snp_leave_out_one_chrom(test_snps="../feature_selection/examples/toydata.5chrom", pheno=pheno_fn, h2=.2)
-    >>> flutil.manhattan_plot(results_dataframe.as_matrix(["Chr", "ChrPos", "PValue"]),pvalue_line=1e-7)
+    >>> chromosome_starts = flutil.manhattan_plot(results_dataframe.as_matrix(["Chr", "ChrPos", "PValue"]),pvalue_line=1e-7)
     >>> #plt.show()
 
     """

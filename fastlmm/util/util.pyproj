@@ -6,7 +6,7 @@
     <ProjectGuid>{9144f8b5-632b-4a72-bd8e-01d453affb5a}</ProjectGuid>
     <ProjectHome>.</ProjectHome>
     <StartupFile>test.py</StartupFile>
-    <SearchPath>..\..</SearchPath>
+    <SearchPath>c:\source\carlk\fastlmm2.;c:\source\carlk\pysnptools</SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
     <OutputPath>.</OutputPath>
     <Name>util</Name>
@@ -16,7 +16,8 @@
     <SccAuxPath>SAK</SccAuxPath>
     <SccLocalPath>SAK</SccLocalPath>
     <LaunchProvider>Standard Python launcher</LaunchProvider>
-    <CommandLineArguments>runs\2014-01-06_15_31_11_942832124695\distributable.p LocalInParts(115,1920,mkl_num_threads=None)</CommandLineArguments>
+    <CommandLineArguments>
+    </CommandLineArguments>
     <InterpreterPath />
     <InterpreterArguments />
     <IsWindowsApplication>False</IsWindowsApplication>

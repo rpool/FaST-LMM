@@ -275,9 +275,9 @@ class TestFeatureSelection(unittest.TestCase):
             else:
                 delimiter = "," if outfile.lower().endswith(".csv") else "\t"
                 tmpOutfile=os.path.join(output_dir,outfile)
-                out,msg=ut.compare_files(tmpOutfile, referenceOutfile, self.tolerance,delimiter=delimiter)
+                out,msg=ut.compare_mixed_files(tmpOutfile, referenceOutfile, self.tolerance,delimiter=delimiter)
                 #if not out:
-                    #import pdb; pdb.set_trace() #This will mess up LocalMultiProc runs
+                #    print "False" #import pdb; pdb.set_trace() #This will mess up LocalMultiProc runs
                 self.assertTrue(out, "msg='{0}', ref='{1}', tmp='{2}'".format(msg, referenceOutfile, tmpOutfile))
       
      
@@ -508,7 +508,7 @@ def getTestSuite():
     """
     suite1 = unittest.TestLoader().loadTestsFromTestCase(TestTwoKernelFeatureSelection)
     suite2 = unittest.TestLoader().loadTestsFromTestCase(TestFeatureSelection)
-    return unittest.TestSuite([suite1,suite2])
+    return unittest.TestSuite([suite2])  #!!!cmk suite1,
 
 
 if __name__ == '__main__':
