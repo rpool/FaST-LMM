@@ -3,8 +3,6 @@
 
 FaST-LMM, which stands for Factored Spectrally Transformed Linear Mixed Models, is a program for performing both single-SNP and SNP-set genome-wide association studies (GWAS) on extremely large data sets.  This release contains the improvements described in Widmer _et al._, _Scientific Reports_ 2014, and tests for epistasis.
 
-See the FaST-LMM website for related software:  
-http://research.microsoft.com/en-us/um/redmond/projects/MicrosoftGenomics/Fastlmm/
 
 Our documentation (including live examples) is also available as ipython notebook:
 http://nbviewer.ipython.org/github/MicrosoftGenomics/FaST-LMM/blob/master/doc/ipynb/FaST-LMM.ipynb
@@ -136,3 +134,4 @@ you can see the specific errors.
 
 Note that you must use "python setup.py build_ext --inplace" to run the 
 regression tests, and not "python setup.py install".
+

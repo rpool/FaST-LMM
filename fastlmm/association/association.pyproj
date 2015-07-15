@@ -54,6 +54,7 @@
     <Compile Include="epistasis.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="gwas.py" />
     <Compile Include="single_snp.py">
       <SubType>Code</SubType>
     </Compile>
@@ -93,6 +94,9 @@
     <Compile Include="__init__.py" />
     <Content Include="..\..\AUTHORS.txt">
       <Link>setup\AUTHORS.txt</Link>
+    </Content>
+    <Content Include="..\..\doc\ipynb\FaST-LMM.ipynb">
+      <Link>docsource\FaST-LMM.ipynb</Link>
     </Content>
     <Content Include="..\..\doc\make.bat">
       <Link>docsource\make.bat</Link>
