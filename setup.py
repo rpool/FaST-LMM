@@ -7,7 +7,7 @@ from distutils.command.clean import clean as Clean
 import numpy
 
 # Version number
-version = '0.2.15'
+version = '0.2.16'
 
 
 def readme():
@@ -122,7 +122,7 @@ setup(
                        "examples/toydataTrain.phe"
 					   ]
                  },
-    install_requires = ['scipy>=0.13', 'numpy>=1.6', 'matplotlib>=1.2', 'pandas>=0.15.2', 'scikit-learn>=0.16.1', 'pysnptools>=0.3.0'],
+    install_requires = ['scipy>=0.13', 'numpy>=1.6', 'matplotlib>=1.2', 'pandas>=0.15.2', 'scikit-learn>=0.16.1', 'pysnptools>=0.3.1'],
     cmdclass = cmdclass,
     ext_modules = ext_modules,
   )
