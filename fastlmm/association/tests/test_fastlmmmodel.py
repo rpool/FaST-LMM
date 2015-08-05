@@ -219,6 +219,41 @@ class TestFastLmmModel(unittest.TestCase):
 
         self.compare_files(predicted_pheno,"snps") #"kernel" and "snps" test cases should give the same results
 
+    def test_kernel_one(self):
+        logging.info("TestFastLmmModel test_kernel_one")
+
+        train_idx = np.r_[10:self.snpreader_whole.iid_count] # iids 10 and on
+        test_idx  = np.r_[0:10] # the first 10 iids
+
+        K0_train = self.snpreader_whole[train_idx,:].read_kernel(Unit())
+        covar_train = self.covariate_whole[train_idx,:]
+        pheno_train = self.pheno_whole[train_idx,:]
+        assert np.array_equal(K0_train.iid,covar_train.iid), "Expect iids to be the same (so that early and late Unit standardization will give the same result)"
+        assert np.array_equal(K0_train.iid,pheno_train.iid), "Expect iids to be the same (so that early and late Unit standardization will give the same result)"
+
+        fastlmm_model1 = FastLmmModel.learn(K0_train, covar_train, pheno_train)
+        filename = self.tempout_dir + "/model_kernel_one.flm.npz"
+        pstutil.create_directory_if_necessary(filename)
+        fastlmm_model1.save(filename)
+        fastlmm_model2 = FastLmmModel.load(filename)
+                
+        # predict on test set
+        G0_test = self.snpreader_whole[test_idx,:]
+        covar_test = self.covariate_whole[test_idx,:]
+
+        K0_test = self.snpreader_whole[train_idx,:].read_kernel(Unit(),test=self.snpreader_whole[test_idx,:])
+        predicted_pheno = fastlmm_model2.predict(K0_test, covar_test)
+
+        output_file = self.file_name("kernel_one")
+        Dat.write(output_file,predicted_pheno)
+
+        pheno_actual = self.pheno_whole[test_idx,:].read().val[:,0]
+
+        #pylab.plot(pheno_actual, predicted_pheno.val,".")
+        #pylab.show()
+
+
+        self.compare_files(predicted_pheno,"one") #Expect same results as SNPs "one"
 
     def compare_files(self,answer,ref_base):
         reffile = TestFeatureSelection.reference_file("fastlmmmodel/"+ref_base+".dat")

@@ -170,9 +170,9 @@ class FastLmmModel(object):
             K0_test = _kernel_fixup(K0_test, None, iid_if_none=covar_test.iid)
         else:
             K0_test = _kernel_fixup(K0_test, None, None)
-            covar_test = _pheno_fixup(covar_test,iid_if_none=K0_test.iid)
+            covar_test = _pheno_fixup(covar_test,iid_if_none=K0_test.iid1)
 
-        K0_test, covar_test  = intersect_apply([K0_test, covar_test],intersect_before_standardize=True) #!!!cmk check that 'True' is what we want
+        K0_test, covar_test  = intersect_apply([K0_test, covar_test],intersect_before_standardize=True,is_test=True) #!!!cmk check that 'True' is what we want
 
         covar_test = covar_test.read().standardize(self.covar_unit_trained)
 
@@ -202,7 +202,7 @@ class FastLmmModel(object):
             K0_test = K0_test.read()#!!!cmk .standardize() #!!!cmk block_size???
             if abs(self.factor-1.0)>1e-15:
                 K0_test.val *= self.factor
-            lmm.setTestData(Xstar=covar_test.val, K0star=K0_test.val)
+            lmm.setTestData(Xstar=covar_test.val, K0star=K0_test.val.T)
 
 
         pheno_predicted = lmm.predictMean(beta=self.beta, h2=self.h2).reshape(-1,1)
