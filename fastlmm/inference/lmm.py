@@ -80,6 +80,7 @@ class LMM(object):
         y       : [N] 1-dimensional array of phenotype values
         --------------------------------------------------------------------------
         '''
+        assert y.ndim==1, "y should be 1-dimensional"
         self.y   = y
         self.Uy  = self.U.T.dot(y)
         k=self.S.shape[0]
@@ -153,7 +154,7 @@ class LMM(object):
                     self.S*=(N/self.S.sum())
                     self.U=self.G.dot(V_[:,S_nonz]/SP.sqrt(self.S))
             else:
-                if K0 == None:
+                if K0 is None:
                     K0=self.G0.dot(self.G0.T);
                 self.K0=K0
                 if (self.G1 is not None) and (K1 is None):
@@ -181,11 +182,14 @@ class LMM(object):
         '''
         self.K0 = K0
         self.K1 = K1
+        logging.debug("About to mix K0 and K1")
         if K1 is None:
             self.K = K0
         else:
             self.K = (1.0-a2) * K0 + a2 * K1
+        logging.debug("About to eigh")
         [S,U] = LA.eigh(self.K)
+        logging.debug("Done with to eigh")
         if np.any(S < -0.1):
             logging.warning("kernel contains a negative Eigenvalue")
 
@@ -255,7 +259,7 @@ class LMM(object):
             if (resmin[0] is None) or (res['nLL']<resmin[0]['nLL']):
                 resmin[0]=res
             t1=time.time()
-            #print "one objective function call took %.2f seconds elapsed" % (t1-t0)
+            logging.info("x={0}. one objective function call took {1} seconds elapsed ".format(x,t1-t0))
             #import pdb; pdb.set_trace()
             return res['nLL']
         if verbose: logging.info("finda2")
@@ -489,7 +493,7 @@ class LMM(object):
                   'a2':self.a2,
                   'scale':scale
                   }        
-        assert SP.isreal(nLL), "nLL has an imaginary component, possibly due to constant covariates"
+        assert SP.all(SP.isreal(nLL)), "nLL has an imaginary component, possibly due to constant covariates"
         return result
 
 
@@ -547,11 +551,12 @@ class LMM(object):
 
         --------------------------------------------------------------------------
         Input:
-        Xstar           : [M*D] 2-dimensional array of covariates
-        G0star          : [M*k0] array of random effects
-        G1star          : [M*k1] array of random effects (optional)
-        K0star          : [M*N] array, random effects covariance between test and training data (positive semi-definite)
-        K1star          : [M*N] array, random effects covariance between test and training data (positive semi-definite)(optional)
+        Xstar           : [M,D] 2-dimensional array of covariates on the test set
+        G0star          : [M,k0] array of random effects on the test set
+        G1star          : [M,k1] array of random effects on the test set (optional)
+        K0star          : [M,N] array, random effects covariance between test and training data (positive semi-definite)
+        K1star          : [M,N] array, random effects covariance between test and training data (positive semi-definite)(optional)
+        where M is # of test cases, N is the # of training cases
         --------------------------------------------------------------------------
         '''
         
@@ -578,7 +583,7 @@ class LMM(object):
 
         self.UKstar = SP.dot(self.U.T,self.Kstar.T)
 
-        if self.G!=None:
+        if self.G is not None:
             k = self.G.shape[1]
             N = self.G.shape[0]
             if k<N:
@@ -592,6 +597,7 @@ class LMM(object):
         mean prediction for the linear mixed model on unobserved data:
 
         ystar = X*beta + Kstar(h2*K + (1-h2)*K)^{-1}(y-X*beta)  
+        where Kstar is the train vs test kernel
         --------------------------------------------------------------------------
         Input:
         beta            : weight vector for fixed effects
@@ -599,6 +605,7 @@ class LMM(object):
         logdelta        : log(delta) allows to optionally parameterize in delta space
         delta           : delta     allows to optionally parameterize in delta space
         scale           : Scale parameter the multiplies the Covariance matrix (default 1.0)
+
 
         If SNPs are excluded, nLLeval must be called before to re-calculate self.UW,self.UUW
         --------------------------------------------------------------------------
@@ -619,10 +626,11 @@ class LMM(object):
         if logdelta is not None:
             delta = SP.exp(logdelta)
 
+        #delta = (1-h2) / h2
         if delta is not None:
             Sd = (self.S+delta)*scale
         else:
-            assert False, "not implemented (UKstar needs to be scaled by h2)"
+            #assert False, "not implemented (UKstar needs to be scaled by h2)"
             Sd = (h2*self.S + (1.0-h2))*scale
 
         if len(self.exclude_idx) > 0:
@@ -736,6 +744,8 @@ class LMM(object):
         else:
             #Sd = (h2*self.S + (1.0-h2))*sigma2
             Sd = (h2*self.S + (1.0-h2))
+            assert False, "h2 code path not test. Plese use delta or logdelta"
+            #delta = 1.0/h2-1.0 #right?
             
         Sdi = 1./Sd
         
@@ -743,7 +753,7 @@ class LMM(object):
         #TODO: handle h2 parameterization
         #TODO: make more efficient (add_diag)
 
-        if Kstar_star == None:
+        if Kstar_star is None:
             N_test = self.Gstar.shape[0]
             Kstar_star = SP.dot(self.Gstar, self.Gstar.T)
         else:
@@ -789,8 +799,8 @@ class LMM(object):
         Var_star = part1 - SUKstarTUkStar
         
         return Var_star
-        
 
+    
     def nLLeval_test(self, y_test, beta, h2=0.0, logdelta=None, delta=None, sigma2=1.0, Kstar_star=None, robust=False):
         """
         compute out-of-sample log-likelihood
@@ -799,7 +809,7 @@ class LMM(object):
                 indicates if eigenvalues will be truncated at 1E-9 or 1E-4. The former (default) one was used in FastLMMC,
                 but may lead to numerically unstable solutions.
         """
-
+        assert y_test.ndim == 1, "y_test should have 1 dimension"
         mu = self.predictMean(beta, h2=h2, logdelta=logdelta, delta=delta)
         res = y_test - mu
 
@@ -825,6 +835,7 @@ class LMM(object):
             S_nonz=(S_>1E-4)
         else:
             S_nonz=(S_>1E-9)
+        assert sum(S_nonz) > 0, "Some eigenvalues should be nonzero"
         S = S_[S_nonz]
         U = U_[:, S_nonz]
         Sdi = 1 / S
@@ -839,7 +850,7 @@ class LMM(object):
 
         # see Carl Rasmussen's book on GPs, equation 5.10, or 
         term1 = -0.5 * logdetK
-        term2 = -0.5 * SP.dot(res_sig.T, res) # res^2 / sigma2
+        term2 = -0.5 * SP.dot(res_sig.reshape(-1).T, res.reshape(-1)) #Change the inputs to the functions so that these are vectors, not 1xn,nx1
         term3 = -0.5 * len(res) * SP.log(2 * SP.pi)
 
         if term2 < -10000:
@@ -848,9 +859,9 @@ class LMM(object):
             SC = S.copy()
             SC.sort()
 
-            print "delta:", delta, "log det", logdetK, "term 2", term2, "term 3:", term3
-            print "largest eigv:", SC[-1], "second largest eigv:", SC[-2], "smallest eigv:", SC[0]
-            print "ratio 1large/2large:", SC[-1]/SC[-2], "ratio lrg/small:", SC[-1]/SC[0]
+            logging.warning(["delta:", delta, "log det", logdetK, "term 2", term2, "term 3:", term3 ])
+            logging.warning(["largest eigv:", SC[-1], "second largest eigv:", SC[-2], "smallest eigv:", SC[0] ])
+            logging.warning(["ratio 1large/2large:", SC[-1]/SC[-2], "ratio lrg/small:", SC[-1]/SC[0] ])
         
         neg_log_likelihood = -(term1 + term2 + term3)
 

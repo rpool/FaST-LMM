@@ -18,11 +18,12 @@ import ctypes
 import datetime
 from tempfile import TemporaryFile
 
+#!!!cmk currently any output files should be in the home directory, e.g. "aric.depnet.txt" not r"tempout\aric.depnet.txt". Fix this.
 class Hadoop2: # implements IRunner
 
     fileshare = "/user"
 
-    def __init__(self, taskcount, mapmemory=-1, reducememory=-1, mkl_num_threads=None,queue="default",skipsourcecheck=False,skipdatacheck=False,logging_handler=logging.StreamHandler(sys.stdout)):
+    def __init__(self, taskcount, mapmemory=-1, xmx=None, min_alloc=None, reducememory=-1, mkl_num_threads=None,queue="default",skipsourcecheck=False,skipdatacheck=False,logging_handler=logging.StreamHandler(sys.stdout)):
         logger = logging.getLogger()
         if not logger.handlers:
             logger.setLevel(logging.INFO)
@@ -40,6 +41,8 @@ class Hadoop2: # implements IRunner
         self.queue = queue
         self.skipsourcecheck = skipsourcecheck
         self.skipdatacheck = skipdatacheck
+        self.xmx = xmx
+        self.yarn_scheduler_minimum_allocation_mb=min_alloc #yarn.scheduler.minimum-allocation-mb=2048
         logging.info('done constructing Hadoop2 runner')
 
     def run(self, distributable):
@@ -47,7 +50,7 @@ class Hadoop2: # implements IRunner
 
         # Check that the local machine has python path set
         localpythonpath = os.environ.get("PYTHONPATH")#!!should it be able to work without pythonpath being set (e.g. if there was just one file)? Also, is None really the return or is it an exception.
-        if localpythonpath == None: raise Exception("Expect local machine to have 'pythonpath' set")
+        if localpythonpath is None: raise Exception("Expect local machine to have 'pythonpath' set")
 
         remotewd, run_dir_abs, run_dir_rel = self.create_run_dir()
 
@@ -123,16 +126,26 @@ class Hadoop2: # implements IRunner
         #-D mapred.tasktracker.expiry.interval=3600000 ^
 
         logging.info("running {0}".format(str(distributable)))
+
+        if self.xmx is None:
+            xmx_string = ""
+        else:
+            xmx_string = "\n        -D mapreduce.map.java.opts=-Xmx{0}m ^".format(self.xmx)
+
+        if self.yarn_scheduler_minimum_allocation_mb is None:
+            min_alloc_string = ""
+        else:
+            min_alloc_string = "\n     -D yarn.scheduler.minimum-allocation-mb={0} ^".format( self.yarn_scheduler_minimum_allocation_mb)
         
 
-        s = r"""%HADOOP_HOME%\bin\hadoop jar %HADOOP_HOME%\share\hadoop\tools\lib\hadoop-streaming-2.4.0.2.1.3.0-1948.jar ^
+        s = r"""%HADOOP_HOME%\bin\hadoop jar %HADOOP_HOME%\share\hadoop\tools\lib\hadoop-streaming-2.6.0.2.2.4.2-0002.jar ^
         -archives "{0}" ^
         -files "{1}" ^
         -D mapred.job.name="{8}" ^
         -D mapred.map.tasks={4} ^
         -D mapred.reduce.tasks=1 ^
-        -D mapred.job.map.memory.mb={5} ^
-        -D mapred.job.reduce.memory.mb={6} ^
+        -D mapreduce.map.memory.mb={5} ^
+        -D mapreduce.reduce.memory.mb={6} ^{10}{11}
         -D mapred.task.timeout={7} ^
         -D mapred.job.queue.name="{9}" ^
         -input {2} ^
@@ -150,7 +163,9 @@ class Hadoop2: # implements IRunner
                     self.reducememory,                  #6
                     0,                                  #7
                     str(distributable).replace("\n","")[:60],                 #8
-                    self.queue                         #9
+                    self.queue,                         #9
+                    xmx_string,                         #10
+                    min_alloc_string                    #11
                     )
         runHadoopFileName = run_dir_rel + os.path.sep + "runHadoop.bat"
         logging.info("Hadoop2 runner is creating '{0}'".format(runHadoopFileName))
@@ -180,7 +195,7 @@ class Hadoop2: # implements IRunner
         #if stderr != "" : raise Exception("Stderr from command: '{0}'".format(stderr))
 
     def FindOrCreatePythonSettings(self, remotewd):
-        localpythonpathsetting = r"\\msr-arrays\Scratch\msr-pool\Scratch_Storage6\redmond\.continuum" # os.path.join(os.environ.get("userprofile"),".continuum")
+        localpythonpathsetting = r"\\GCR\Scratch\RR1\eScience\.continuum" # os.path.join(os.environ.get("userprofile"),".continuum")
         lastFolderName = os.path.split(os.path.normpath(localpythonpathsetting))[1]
         #util.create_directory_if_necessary(localpythonpathsetting,isfile=False)
 
@@ -224,7 +239,7 @@ class Hadoop2: # implements IRunner
             batfilename_abs_list.append(batfilename_abs)
             util.create_directory_if_necessary(batfilename_rel, isfile=True)
             with open(batfilename_rel, "w") as batfile:
-                batfile.write("@set path={0};{0}\Scripts;%path%\n".format(r"c:\GCD\esciencepy"))
+                batfile.write("@set path={0};{0}\Scripts;%path%\n".format("c:\GCD\esciencepy4"))
                 batfile.write("@set PYTHONPATH={0}\n".format(remotepythonpath))
                 batfile.write("@set home=%cd%\n")
                 #batfile.write("@mklink /d .continuum continuum\n")
@@ -336,6 +351,7 @@ class ListCopier(object): #Implements ICopier
 
     def input(self,item):
         if isinstance(item, str):
+            #!!!cmk item = item.replace('\\','/') # replace any backslashes in the file names with forward slashes.
             self.inputList.append(item)
         elif hasattr(item,"copyinputs"):
             item.copyinputs(self)
@@ -344,6 +360,7 @@ class ListCopier(object): #Implements ICopier
 
     def output(self,item):
         if isinstance(item, str):
+            #!!!cmk item = item.replace('\\','/') # replace any backslashes in the file names with forward slashes.
             self.outputList.append(item)
         elif hasattr(item,"copyoutputs"):
             item.copyoutputs(self)
@@ -387,7 +404,7 @@ class HadoopCopier(object): #Implements ICopier
 
     @staticmethod
     def CheckUpdateTgz(directory0, subsubItemList1 = None, skipcheck=False, filter_hidden=True):
-        if subsubItemList1 == None:
+        if subsubItemList1 is None:
                 subsubItemList1 = [[]]
         directory = os.path.normpath(directory0)
         tgzName =  directory + ".tgz"
