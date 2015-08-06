@@ -15,6 +15,7 @@ from fastlmm.util.runner import Local, HPC, LocalMultiProc
 from pysnptools.snpreader import Dat, Bed, Pheno
 from fastlmm.feature_selection.test import TestFeatureSelection
 from pysnptools.standardizer import Unit
+from pysnptools.kernelreader import Identity as KernelIdentity
 
 class TestFastLmmModel(unittest.TestCase):
 
@@ -30,6 +31,9 @@ class TestFastLmmModel(unittest.TestCase):
 
     tempout_dir = "tempout/fastlmmmodel"
 
+    #!!!cmk add a test case that passes K0=None, has a cov and that predicts on new data
+    #        the code be able to both 1. Create a Kernel Identity that works with rectangeles and 2. create a SnpKernel with zero snp count
+
     def file_name(self,testcase_name):
         temp_fn = os.path.join(self.tempout_dir,testcase_name+".dat")
         if os.path.exists(temp_fn):
@@ -37,7 +41,7 @@ class TestFastLmmModel(unittest.TestCase):
         return temp_fn
     #!!!cmk add reference files to source control
 
-    def test_one(self):
+    def xcmktest_one(self):
         logging.info("TestFastLmmModel test_one")
 
         train_idx = np.r_[10:self.snpreader_whole.iid_count] # iids 10 and on
@@ -70,7 +74,7 @@ class TestFastLmmModel(unittest.TestCase):
 
         self.compare_files(predicted_pheno,"one")
 
-    def test_lr(self):
+    def xcmktest_lr(self):
         logging.info("TestFastLmmModel test_lr")
 
         train_idx = np.r_[10:self.snpreader_whole.iid_count] # iids 10 and on
@@ -111,6 +115,69 @@ class TestFastLmmModel(unittest.TestCase):
 
         self.compare_files(predicted_pheno,"lr")
 
+    def test_lr2(self):
+        logging.info("TestFastLmmModel test_lr2")
+
+        train_idx = np.r_[10:self.snpreader_whole.iid_count] # iids 10 and on
+        test_idx  = np.r_[0:10] # the first 10 iids
+
+        #make covar just numbers 0,1,...
+        covar = self.covariate_whole.read()
+        covar.val = np.array([[float(num)] for num in xrange(covar.iid_count)])
+        covar_train = covar[train_idx,:].read()
+        covar_test = covar[test_idx,:].read()
+        #make pheno  # pheno = 2*covar+100+normal(0,1)*10
+        pheno = self.pheno_whole.read()
+        np.random.seed(0)
+        pheno.val = covar.val * 2.0 + 100 + np.random.normal(size=covar.val.shape)*10
+        pheno_train = pheno[train_idx,:].read()
+        pheno_test = pheno[test_idx,:].read()
+
+        #Plot training x and y
+        pylab.plot(covar_train.val, pheno_train.val,".",covar_test.val, pheno_test.val,".")
+        pylab.show()
+
+        #These should all give the same result
+        for name,K0_train,K0_test in [("Identity Kernel",KernelIdentity(self.snpreader_whole.iid[train_idx]),KernelIdentity(self.snpreader_whole.iid[train_idx],test=self.snpreader_whole.iid[test_idx])),
+                                 ("sid_count=0", self.snpreader_whole[train_idx,[]],self.snpreader_whole[test_idx,[]])]:
+
+            #Learn model, save, load
+            fastlmm_modelx = FastLmmModel.learn(K0_train=K0_train, covar_train=covar_train, pheno_train=pheno_train)
+            #!!!cmk put back
+            fastlmm_model = fastlmm_modelx
+            #filename = self.tempout_dir + "/model_lr2.flm.npz"
+            #pstutil.create_directory_if_necessary(filename)
+            #fastlmm_modelx.save(filename)
+            #fastlmm_model = FastLmmModel.load(filename)
+
+            #Predict with model (test on train)
+            predicted_pheno = fastlmm_model.predict(K0_test=K0_train, covar_test=covar_train) #test on train
+            output_file = self.file_name("lr2a_"+name)
+            Dat.write(output_file,predicted_pheno)
+            # Plot training x and y, and training x with predicted y
+            pylab.plot(covar_train.val,predicted_pheno.val,".")
+            pylab.suptitle(name+": test on train: train X to predicted target")
+            pylab.show()
+            # Plot y and predicted y (test on train)
+            pylab.plot(pheno_train.val,predicted_pheno.val,".")
+            pylab.suptitle(name+": test on train: train target to predicted target")
+            pylab.show()
+            self.compare_files(predicted_pheno,"lr2a_"+name)
+
+            #Predict with model (test on test)
+            predicted_pheno = fastlmm_model.predict(K0_test=K0_test, covar_test=covar_test) #test on train
+            output_file = self.file_name("lr2b")
+            Dat.write(output_file,predicted_pheno)
+            # Plot testing x and y, and testing x with predicted y
+            pylab.plot(covar_test.val, pheno_test.val,"g.",covar_test.val,predicted_pheno.val,"r.")
+            pylab.suptitle(name+": test on test: test X to true target (green) and prediction (red)")
+            pylab.show()
+            # Plot y and predicted y (test on train)
+            pylab.plot(pheno_test.val,predicted_pheno.val,".")
+            pylab.suptitle(name+": test on test: true target to prediction")
+            pylab.show()
+            self.compare_files(predicted_pheno,"lr2b")
+
     #!!!cmk get this working
     def xtest_lr_no_K0(self):
         logging.info("TestFastLmmModel test_lr_no_k0")
@@ -138,7 +205,7 @@ class TestFastLmmModel(unittest.TestCase):
 
         self.compare_files(predicted_pheno,"lr_no_k0")
 
-    def test_snps(self):
+    def xcmktest_snps(self):
         logging.info("TestFastLmmModel test_snps")
 
         train_idx = np.r_[10:self.snpreader_whole.iid_count] # iids 10 and on
@@ -177,7 +244,7 @@ class TestFastLmmModel(unittest.TestCase):
 
         self.compare_files(predicted_pheno,"snps")
 
-    def test_kernel(self):
+    def xcmktest_kernel(self):
         logging.info("TestFastLmmModel test_kernel")
 
         train_idx = np.r_[10:self.snpreader_whole.iid_count] # iids 10 and on
@@ -219,7 +286,7 @@ class TestFastLmmModel(unittest.TestCase):
 
         self.compare_files(predicted_pheno,"snps") #"kernel" and "snps" test cases should give the same results
 
-    def test_kernel_one(self):
+    def xcmktest_kernel_one(self):
         logging.info("TestFastLmmModel test_kernel_one")
 
         train_idx = np.r_[10:self.snpreader_whole.iid_count] # iids 10 and on
@@ -266,7 +333,7 @@ class TestFastLmmModel(unittest.TestCase):
                 r_v = reference.val[iid_index,sid_index]
                 assert abs(a_v - r_v) < 1e-5, "Value at {0},{1} differs too much from file '{2}'".format(iid_index,sid_index,reffile)
 
-    def test_doctest(self):
+    def xcmktest_doctest(self):
         old_dir = os.getcwd()
         os.chdir(os.path.dirname(os.path.realpath(__file__))+"/..")
         result = doctest.testfile("../fastlmmmodel.py")

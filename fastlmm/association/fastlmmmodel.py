@@ -77,6 +77,8 @@ class FastLmmModel(object):
         pheno_train = _pheno_fixup(pheno_train)
         assert pheno_train.sid_count == 1, "Expect pheno to be just one variable"
         covar_train = _pheno_fixup(covar_train, iid_if_none=pheno_train.iid)
+
+        #!!!cmk delete this line (not the next): if K0_train is not None: #If K0_train is None, we leave it
         K0_train = _kernel_fixup(K0_train, None, iid_if_none=pheno_train.iid) #!!!cmk if K0_train is None we could set it to KernelIdentity or we could make it SNPs with zero width
 
         K0_train, covar_train, pheno_train  = intersect_apply([K0_train, covar_train, pheno_train],intersect_before_standardize=True) #!!!cmk check that 'True' is what we want
@@ -114,7 +116,13 @@ class FastLmmModel(object):
             G0_train.val *= np.sqrt(factor)
             G0_train_sid = G0_train.sid
             lmm.setG(G0=G0_train.val)
+        #elif K0_train is None: #!!!cmk remove this section
+        #    factor = None
+        #    lmm.setG(K0=np.zeros([0,0]))
+        #    G0_unit_trained = None
+        #    G0_train_sid = None
         else:
+            #when K0_train is None or Identity should we use setG with None?
             #!!!cmk Use standardize, but remember it
             K0_train = K0_train.read()#.standardize() #!!!cmk block_size??? 
             factor = float(K0_train.iid_count) / np.diag(K0_train.val).sum()
