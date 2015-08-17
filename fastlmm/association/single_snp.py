@@ -140,7 +140,7 @@ def single_snp_leave_out_one_chrom(test_snps, pheno,
     :type pheno: a 'pheno dictionary' or a string
 
 
-    :param G1: SNPs from which to construct a second simalirty matrix, optional. Also, see 'mixing').
+    :param G1: SNPs from which to construct a second similarity matrix, optional. Also, see 'mixing').
           If you give a string, it should be the base name of a set of PLINK Bed-formatted files.
     :type G1: a :class:`.SnpReader` or a string
 

@@ -36,22 +36,27 @@ def _pheno_fixup(pheno_input, iid_if_none=None, missing ='-9'):
 
     return pheno_input
 
-def _kernel_fixup(input, G, iid_if_none):
-    if G is not None:
-        warnings.warn("G0 and G1 are deprecated. Use K0 and K1 instead", DeprecationWarning)
-        assert input is None, "If a G is given, its K must not be given."
-        input = G
+def _kernel_fixup(input, iid_if_none, standardizer, test=None, test_iid_if_none=None):
+    if test is not None and input is None:
+        input = test
+        test = None
 
     if isinstance(input, str) and input.endswith(".npz"):
-            return KernelNpz(input)
-    elif isinstance(input, str):
-            return SnpKernel(Bed(input),standardizer=Unit())
-    elif isinstance(input,SnpReader):
-        return SnpKernel(input,standardizer=Unit())
-    elif input is None:
-        return KernelIdentity(iid=iid_if_none)
-    else:
-        return input
+        return KernelNpz(input)
+
+    if isinstance(input, str):
+        input = Bed(input)
+    if isinstance(test, str):
+        test = Bed(test)
+
+    if isinstance(input,SnpReader):
+        return SnpKernel(input,standardizer=standardizer,test=test)
+
+    if input is None:
+        return KernelIdentity(iid=iid_if_none,test=test_iid_if_none)
+
+    return input
+
 
 class FastLmmModel(object):
 
@@ -79,7 +84,7 @@ class FastLmmModel(object):
         covar_train = _pheno_fixup(covar_train, iid_if_none=pheno_train.iid)
 
         #!!!cmk delete this line (not the next): if K0_train is not None: #If K0_train is None, we leave it
-        K0_train = _kernel_fixup(K0_train, None, iid_if_none=pheno_train.iid) #!!!cmk if K0_train is None we could set it to KernelIdentity or we could make it SNPs with zero width
+        K0_train = _kernel_fixup(K0_train, iid_if_none=pheno_train.iid, standardizer=Unit()) #!!!cmk if K0_train is None we could set it to KernelIdentity or we could make it SNPs with zero width
 
         K0_train, covar_train, pheno_train  = intersect_apply([K0_train, covar_train, pheno_train],intersect_before_standardize=True) #!!!cmk check that 'True' is what we want
 
@@ -99,7 +104,7 @@ class FastLmmModel(object):
 
         #Special case: The K0 kernel is defined implicitly with SNP data
         if isinstance(K0_train, SnpKernel): #!!!cmk would it be more pythonisque to use a try/catch?
-            assert isinstance(K0_train.standardizer,Unit), "Expect Unit standardardizer"
+            assert isinstance(K0_train.standardizer,Unit), "Expect Unit standardizer"
             G0_train = K0_train.snpreader.read()
 
             #!!!cmk we remember this
@@ -108,12 +113,15 @@ class FastLmmModel(object):
             ## Scale G_train so that its K will have a diagonal of iid_count. While not absolutely required, this scaling
             ## improves the search for the best h2. If G_test is available, scale the two parts together. If not,
             ## find the scale factor on just train and later apply it to test.
-            vec = G0_train.val.reshape(-1, order="A") #!!!cmk would be nice to not have this code in two places
-            ## make sure no copy was made
-            assert not vec.flags['OWNDATA'] #!!!cmk add trained version of diag.. inside pysnptools
-            squared_sum = vec.dot(vec)
-            factor = 1./(squared_sum / float(G0_train.iid_count))
-            G0_train.val *= np.sqrt(factor)
+            if G0_train.sid_count == 0:
+                factor = 1
+            else:
+                vec = G0_train.val.reshape(-1, order="A") #!!!cmk would be nice to not have this code in two places
+                ## make sure no copy was made
+                assert not vec.flags['OWNDATA'] #!!!cmk add trained version of diag.. inside pysnptools
+                squared_sum = vec.dot(vec)
+                factor = 1./(squared_sum / float(G0_train.iid_count))
+                G0_train.val *= np.sqrt(factor)
             G0_train_sid = G0_train.sid
             lmm.setG(G0=G0_train.val)
         #elif K0_train is None: #!!!cmk remove this section
@@ -138,15 +146,19 @@ class FastLmmModel(object):
 
         # Find the best h2 and also on covariates (not given from new model)
         if h2 is None:
-            res = lmm.findH2()
+            res = lmm.findH2() #!!!why is REML true in the return???
         else:
             res = lmm.nLLeval(h2=h2)
 
+
+        #We compute sigma2 instead of using res['sigma2'] because res['sigma2'] is only the pure noise.
+        full_sigma2 = float(sum((np.dot(covar_train.val,res['beta']).reshape(-1,1)-pheno_train.val)**2))/pheno_train.iid_count #!!!cmk this is non REML. Is that right?
 
         ###### all references to 'fastlmm_model' should be here so that we don't forget any
         fastlmm_model = FastLmmModel()
         fastlmm_model.beta = res['beta']
         fastlmm_model.h2 = res['h2']
+        fastlmm_model.sigma2 = full_sigma2
         fastlmm_model.U = lmm.U
         fastlmm_model.S = lmm.S
         fastlmm_model.K = lmm.K
@@ -158,6 +170,7 @@ class FastLmmModel(object):
         fastlmm_model.factor = factor
         fastlmm_model.G0_unit_trained = G0_unit_trained
         fastlmm_model.covar_unit_trained = covar_unit_trained
+        fastlmm_model.K0_train_iid = K0_train.iid
         fastlmm_model.G0_sid = G0_train_sid
         fastlmm_model.covar_sid = covar_train.sid
         fastlmm_model.pheno_sid = pheno_train.sid
@@ -165,22 +178,24 @@ class FastLmmModel(object):
         return fastlmm_model
 
     #!!!cmk need to test on both low-rank and full-rank
-    def predict(self,K0_test=None,covar_test=None):
+    def predict(self,K0_test=None,K0_test_test=None,covar_test=None): #!!!cmk K0_test_test need a _fixup, etc and testing
         #!!!cmk ask david to confirm that G's must have zero mean, but not 1 std (because the diag changes that)
         #!!!have a way so that test & train snps can be optionally standardized together
         #!!!have an option for a 2nd cov and to search (or set a2)
 
         assert K0_test is not None or covar_test is not None, "Cannot have both K0_test and covar_test as None (but either can have zero features)"
 
-        ##!!!cmk if K0_test is None we could set it to KernelIdentity or we could make it SNPs with zero width
+        assert (K0_test is None) == (K0_test_test is None), "K0_test_test should be given exactly when K0_test is given"
+
         if K0_test is None:
             covar_test = _pheno_fixup(covar_test)
-            K0_test = _kernel_fixup(K0_test, None, iid_if_none=covar_test.iid)
+            K0_test = _kernel_fixup(None, iid_if_none=self.K0_train_iid, standardizer=self.G0_unit_trained, test=K0_test, test_iid_if_none=covar_test.iid)
         else:
-            K0_test = _kernel_fixup(K0_test, None, None)
+            K0_test = _kernel_fixup(None, iid_if_none=None, standardizer=self.G0_unit_trained, test=K0_test, test_iid_if_none=None)
             covar_test = _pheno_fixup(covar_test,iid_if_none=K0_test.iid1)
+        K0_test_test = _kernel_fixup(K0_test_test, iid_if_none=covar_test.iid, standardizer=self.G0_unit_trained)
 
-        K0_test, covar_test  = intersect_apply([K0_test, covar_test],intersect_before_standardize=True,is_test=True) #!!!cmk check that 'True' is what we want
+        K0_test, covar_test,K0_test_test  = intersect_apply([K0_test, covar_test,K0_test_test],intersect_before_standardize=True,is_test=True) #!!!cmk check that 'True' is what we want
 
         covar_test = covar_test.read().standardize(self.covar_unit_trained)
 
@@ -188,7 +203,7 @@ class FastLmmModel(object):
         covar_test = SnpData(iid=covar_test.iid,
                               sid=FastLmmModel.new_snp_name(covar_test),
                               val=np.c_[covar_test.read().val,np.ones((covar_test.iid_count,1))])
-        assert np.array_equal(covar_test.sid,self.covar_sid), "Expect G0 sids to be the same in train and test."
+        assert np.array_equal(covar_test.sid,self.covar_sid), "Expect covar sids to be the same in train and test."
 
         lmm = LMM()
         lmm.U = self.U
@@ -200,27 +215,49 @@ class FastLmmModel(object):
         lmm.UX = self.UX
 
         if isinstance(K0_test, SnpKernel): #!!!cmk would it be more pythonisque to use a try/catch?
-            assert isinstance(K0_test.standardizer,Unit), "Expect Unit standardardizer"
-            G0_test = K0_test.snpreader.read().standardize(self.G0_unit_trained)
+            assert isinstance(K0_test.standardizer,Unit) or isinstance(K0_test.standardizer,UnitTrained), "Expect Unit or UnitTrained standardardizer"
+            G0_test = K0_test.test.read().standardize(self.G0_unit_trained)
             if abs(self.factor-1.0)>1e-15:
                 G0_test.val *= np.sqrt(self.factor)
+                K0_test_test = K0_test_test.read() #!!!cmk what if in snp space?
+                K0_test_test.val *= self.factor
             assert np.array_equal(G0_test.sid,self.G0_sid), "Expect G0 sids to be the same in train and test."
             lmm.setTestData(Xstar=covar_test.val, G0star=G0_test.val)
         else:
             K0_test = K0_test.read()#!!!cmk .standardize() #!!!cmk block_size???
             if abs(self.factor-1.0)>1e-15:
                 K0_test.val *= self.factor
+                K0_test_test = K0_test_test.read() #!!!cmk what if in snp space?
+                K0_test_test.val *= self.factor
             lmm.setTestData(Xstar=covar_test.val, K0star=K0_test.val.T)
 
+        pheno_predicted, covar = lmm.predict_mean_and_variance(beta=self.beta, h2=self.h2,sigma2=self.sigma2, Kstar_star=K0_test_test.read().val)
 
-        pheno_predicted = lmm.predictMean(beta=self.beta, h2=self.h2).reshape(-1,1)
-        ret = SnpData(iid = covar_test.iid, sid=self.pheno_sid,val=pheno_predicted,pos=np.array([[np.nan,np.nan,np.nan]]),parent_string="FastLmmModel Prediction")
+        #pheno_predicted = lmm.predictMean(beta=self.beta, h2=self.h2,scale=self.sigma2).reshape(-1,1)
+        ret0 = SnpData(iid = covar_test.iid, sid=self.pheno_sid,val=pheno_predicted,pos=np.array([[np.nan,np.nan,np.nan]]),parent_string="FastLmmModel Prediction")
+
+        #!!!cmk what if everything done in G0 space?
+        #covar = lmm.predictVariance(sigma2=self.sigma2, h2=self.h2, Kstar_star=K0_test_test.read().val)
+        from pysnptools.kernelreader import KernelData
+        ret1 = KernelData(iid=K0_test_test.iid,val=covar)
+        return ret0, ret1
+
+    def stats(self):
+        sstot = ((self.y-self.y.mean())**2).sum()
+        res2 = (self.y-np.dot(self.X,self.beta))**2
+        ssres=res2.sum()
+        sigma2total = res2.mean()
+        sigma2g = sigma2total * self.h2
+        sigma2e = sigma2total * (1-self.h2)
+        
+        r2 = 1.-ssres/sstot
+        ret = {"r2":r2,'sigma2total':sigma2total,'sigma2g':sigma2g,'sigma2e':sigma2e,'h2':self.h2,'e2':1-self.h2}
         return ret
-
 
     def save(self,filename):
         np.savez(filename,
                  beta=self.beta,
+                 sigma2=self.sigma2,
                  h2=self.h2,
                  U=self.U,
                  S=self.S,
@@ -233,6 +270,7 @@ class FastLmmModel(object):
                  factor=self.factor,
                  G0_unit_trained_stats=self.G0_unit_trained.stats if self.G is not None else None,
                  covar_unit_trained_stats=self.covar_unit_trained.stats,
+                 K0_train_iid = self.K0_train_iid,
                  G0_sid=self.G0_sid,
                  covar_sid=self.covar_sid,
                  pheno_sid=self.pheno_sid
@@ -242,6 +280,7 @@ class FastLmmModel(object):
         with np.load(filename) as data:
             fastlmm_model = FastLmmModel()
             fastlmm_model.beta=data['beta']
+            fastlmm_model.sigma2=data['sigma2']
             fastlmm_model.h2=float(data['h2'])
             fastlmm_model.U=data['U']
             fastlmm_model.S=data['S']
@@ -256,12 +295,102 @@ class FastLmmModel(object):
             fastlmm_model.factor=float(data['factor'])
             fastlmm_model.G0_unit_trained=UnitTrained(stats=data['G0_unit_trained_stats']) if fastlmm_model.G is not None else None
             fastlmm_model.covar_unit_trained=UnitTrained(stats=data['covar_unit_trained_stats'])
+            fastlmm_model.K0_train_iid=data['K0_train_iid']
             fastlmm_model.G0_sid=data['G0_sid']
             if fastlmm_model.G0_sid.shape is ():
                 fastlmm_model.G0_sid = None
             fastlmm_model.covar_sid=data['covar_sid']
             fastlmm_model.pheno_sid=data['pheno_sid']
             return fastlmm_model
+
+#!!!cmk document
+#!!!cmk move to own file
+#!!!cmk make FastLmmModel use this when there are no SNPs or K is Identity
+#!!!cmk as with FastLmmModel change api to use __init__ instead of learn
+class LinearRegressionModel(object):
+    def __init__(self):
+        pass
+
+    @staticmethod
+    def learn(K0_train=None, covar_train=None, pheno_train=None, h2=None):
+        assert K0_train is None #!!!cmk could also check that ID or no snps
+
+        covar_train, pheno_train  = intersect_apply([covar_train, pheno_train])
+        pheno_train = pheno_train.read() #!!!cmk sharing is OK because we don't change it
+        covar_train = covar_train.read() #!!!cmk sharing is OK because we don't change it
+        covar_unit_trained = Unit()._train_standardizer(covar_train,apply_in_place=True) #This also fills missing with the mean #!!!cmk right?
+
+        # add a column of 1's to cov to increase DOF of model (and accuracy) by allowing a constant offset
+        covar_train = SnpData(iid=covar_train.iid,
+                              sid=FastLmmModel.new_snp_name(covar_train),
+                              val=np.c_[covar_train.val,np.ones((covar_train.iid_count,1))])
+
+
+        lsqSol = np.linalg.lstsq(covar_train.val, pheno_train.val[:,0])
+        bs=lsqSol[0] #weights
+        r2=lsqSol[1] #squared residuals
+        D=lsqSol[2]  #rank of design matrix
+        N=pheno_train.iid_count
+
+        linear_regression_model = LinearRegressionModel()
+        linear_regression_model.beta = bs
+        linear_regression_model.ssres = float(r2)
+        linear_regression_model.sstot = ((pheno_train.val-pheno_train.val.mean())**2).sum()
+        linear_regression_model.covar_unit_trained = covar_unit_trained
+        linear_regression_model.iid_count = covar_train.iid_count
+        linear_regression_model.covar_sid = covar_train.sid
+        linear_regression_model.pheno_sid = pheno_train.sid
+        return linear_regression_model
+
+    def predict(self,K0_test=None,K0_test_test=None,covar_test=None): #!!!cmk K0_test_test need a _fixup, etc and testing
+        assert K0_test is None #!!!could also be Identity or no snps
+        assert K0_test_test is None #!!!could also be Identity or no snps
+        assert covar_test is not None, "covar_test is required"
+
+        covar_test = _pheno_fixup(covar_test)
+        covar_test = covar_test.read().standardize(self.covar_unit_trained)
+
+        # add a column of 1's to cov to increase DOF of model (and accuracy) by allowing a constant offset
+        covar_test = SnpData(iid=covar_test.iid,
+                              sid=FastLmmModel.new_snp_name(covar_test),
+                              val=np.c_[covar_test.read().val,np.ones((covar_test.iid_count,1))])
+        assert np.array_equal(covar_test.sid,self.covar_sid), "Expect covar sids to be the same in train and test."
+
+        pheno_predicted = covar_test.val.dot(self.beta).reshape(-1,1)
+        ret0 = SnpData(iid = covar_test.iid, sid=self.pheno_sid,val=pheno_predicted,pos=np.array([[np.nan,np.nan,np.nan]]),parent_string="FastLmmModel Prediction") #!!!replace 'parent_string' with 'name'
+
+        from pysnptools.kernelreader import KernelData
+        ret1 = KernelData(iid=covar_test.iid,val=np.eye(covar_test.iid_count)* self.ssres / self.iid_count)
+        return ret0, ret1
+
+    def stats(self):
+        sigma2total = self.ssres / self.iid_count
+        r2 = 1.-self.ssres/self.sstot
+        ret = {"r2":r2,'sigma2total':sigma2total,'sigma2g':0,'sigma2e':sigma2total,'h2':0,'e2':1}
+        return ret
+
+    def save(self,filename):
+        np.savez(filename,
+                 beta=self.beta,
+                 ssres=self.ssres,
+                 sstot=self.sstot,
+                 covar_unit_trained_stats=self.covar_unit_trained.stats,
+                 iid_count=self.iid_count,
+                 covar_sid=self.covar_sid,
+                 pheno_sid=self.pheno_sid
+                 )
+    @staticmethod
+    def load(filename):
+        with np.load(filename) as data:
+            model = LinearRegressionModel()
+            model.beta=data['beta']
+            model.ssres=data['ssres']
+            model.sstot=data['sstot']
+            model.covar_unit_trained=UnitTrained(stats=data['covar_unit_trained_stats'])
+            model.iid_count=data['iid_count']
+            model.covar_sid=data['covar_sid']
+            model.pheno_sid=data['pheno_sid']
+            return model
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)

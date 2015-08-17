@@ -236,7 +236,7 @@ class TestFeatureSelection(unittest.TestCase):
 
         file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)),"..","..","tests")
         windows_fn = file_path + '/expected-Windows/'+outfile
-        assert os.path.exists(windows_fn)
+        assert os.path.exists(windows_fn), "Can't find file '{0}'".format(windows_fn)
         debian_fn = file_path + '/expected-debian/'+outfile
         if not os.path.exists(debian_fn): #If reference file is not in debian folder, look in windows folder
             debian_fn = windows_fn
