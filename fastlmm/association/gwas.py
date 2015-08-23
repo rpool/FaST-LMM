@@ -35,7 +35,7 @@ import pysnptools.util
 import pysnptools.util.pheno
 import time
 import fastlmm.inference.lmm_cov as lmm_cov
-
+import glob
 
 def create_dir(filename, is_dir=True):
 	if is_dir:
@@ -203,6 +203,20 @@ class GWAS(object):
 			return iid_source_if_none[:,0:0] #return snpreader with no snps
 		else:
 			return snp_input
+
+	@staticmethod
+	def load_results(dir_name,pheno_name):
+		result = None
+		mydir = dir_name + "/" + pheno_name + "/"
+		myfile_pattern = "%s%s_block_*.csv" % (mydir, pheno_name)
+		files = glob.glob(myfile_pattern)
+		for filename in files:
+			res = pd.read_csv(filename)
+			if result is None:
+				result = res
+			else:
+				result = pd.concat((result,res),0)
+		return result
 
 	@staticmethod
 	def _pheno_fixup(pheno_input, iid_source_if_none=None):

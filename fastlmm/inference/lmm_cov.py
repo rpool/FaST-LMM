@@ -84,8 +84,7 @@ class LMM(object):
 		"""
 		N = self.K.shape[0]
 		D = self.linreg.D
-		ar = np.arange(self.K.shape[0])
-		self.K[ar,ar]+=1.0
+		self.K.flat[::N+1]+=1.0
 		K_ = self.linreg.regress(Y=self.K)
 		K_ = self.linreg.regress(Y=K_.T)
 		[self.S,self.U] = la.eigh(K_)
@@ -661,8 +660,8 @@ class LMM(object):
 					'scale':scale}
 		UY,UUY = self.getUY(idx_pheno = idx_pheno)
 		P = UY.shape[1]	#number of phenotypes used
-		YKY = computeAKA(Sd=Sd, denom=denom, UA=UY, UUA=UUY)
-		logdetK = np.log(Sd).sum()
+		#YKY = computeAKA(Sd=Sd, denom=denom, UA=UY, UUA=UUY)
+		#logdetK = np.log(Sd).sum()
 
 		if (UUY is not None):#low rank part
 			logdetK+=(N - k) * np.log(denom)
@@ -824,7 +823,7 @@ class LMM(object):
 			nLL = 0.5 * (logdetK + N * (np.log(2.0 * np.pi * sigma2) + 1))
 		else:#Use multivariate student-t
 			nLL = 0.5 * (logdetK + (dof + N) * np.log(1.0 + r2 / dof))
-			nLL +=  0.5 * N * np.log(dof * np.pi) + SS.gammaln(0.5 * dof) - SS.gammaln(0.5 * (dof + N))
+			nLL +=  0.5 * N * np.log(dof * np.pi) + ss.gammaln(0.5 * dof) - ss.gammaln(0.5 * (dof + N))
 		result = {
                         'nLL':nLL,
                         'dof':dof,
