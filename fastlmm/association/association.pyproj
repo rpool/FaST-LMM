@@ -6,7 +6,7 @@
     <ProjectGuid>{52d85a6d-fd53-41e5-b7e2-6acc38373c98}</ProjectGuid>
     <ProjectHome>
     </ProjectHome>
-    <StartupFile>tests\test_fastlmmmodel.py</StartupFile>
+    <StartupFile>tests\test_heritability_spatical_correction.py</StartupFile>
     <SearchPath>..\..;..\..\..\pysnptools</SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
     <OutputPath>.</OutputPath>
@@ -56,6 +56,9 @@
     </Compile>
     <Compile Include="fastlmmmodel.py" />
     <Compile Include="gwas.py" />
+    <Compile Include="heritability_spatial_correction.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="single_snp.py">
       <SubType>Code</SubType>
     </Compile>
@@ -73,6 +76,7 @@
     <Compile Include="tests\testepistasis.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="tests\test_heritability_spatical_correction.py" />
     <Compile Include="tests\test_fastlmmmodel.py" />
     <Compile Include="tests\test_snp_set.py" />
     <Compile Include="tests\test_single_snp.py">

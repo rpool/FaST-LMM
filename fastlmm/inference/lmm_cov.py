@@ -254,7 +254,7 @@ class LMM(object):
 		W may hold a design matrix G1 of a second kernel and some columns that are identical to columns of the design matrix of the first kernel to enable subtracting out sub kernels (as for correcting for proximal contamination)
 
         Args:
-		    h2      : "heritabiliy" of the kernel matrix
+		    h2      : "heritability" of the kernel matrix
 		    nGridA2 : number of a2-grid points to evaluate the negative log-likelihood at. Number of grid points for Brent search intervals (default: 10)
 		    minA2   : minimum value for a2 optimization
 		    maxA2   : maximum value for a2 optimization
@@ -295,7 +295,7 @@ class LMM(object):
 		W may hold a design matrix G1 of a second kernel and some columns that are identical to columns of the design matrix of the first kernel to enable subtracting out sub kernels (as for correcting for proximal contamination)
 
         Args:
-		    h2      : "heritabiliy" of the kernel matrix
+		    h2      : "heritability" of the kernel matrix
 		    nGridA2 : number of a2-grid points to evaluate the negative log-likelihood at. Number of grid points for Brent search intervals (default: 10)
 		    minA2   : minimum value for a2 optimization
 		    maxA2   : maximum value for a2 optimization
