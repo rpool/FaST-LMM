@@ -42,15 +42,36 @@ class TestHeritabilitySpatialCorrection(unittest.TestCase): #!!!cmk run these
         logging.info(fn)
         tmpOutfile = self.file_name(fn)
 
+        half = self.pheno_whole.read().val
+        pheno = SnpData(iid=self.pheno_whole.iid,sid=["pheno0","pheno1"],val=np.c_[half,half])
+
         spatial_coor = [[i,-i] for i in xrange(self.snpreader_whole.iid_count)]
-        alpha_list = alpha_list_big=[int(v) for v in np.logspace(2,np.log10(4000), 5)]
-        dataframe = heritability_spatial_correction(self.snpreader_whole,spatial_coor,self.snpreader_whole.iid,alpha_list,self.pheno_whole,permute_plus_count=2,jackknife_count=2,permute_times_count=2,just_testing=True)
+        alpha_list = alpha_list_big=[int(v) for v in np.logspace(2,np.log10(4000), 2)] #!!!cmk make smaller than 5
+        dataframe = heritability_spatial_correction(self.snpreader_whole,spatial_coor,self.snpreader_whole.iid,alpha_list,pheno,jackknife_count=2,permute_plus_count=1,permute_times_count=1,just_testing=True)
 
         dataframe.to_csv(tmpOutfile,sep="\t",index=False)
         referenceOutfile = TestFeatureSelection.reference_file("heritability_spatial_correction/"+fn)
         out,msg=ut.compare_files(tmpOutfile, referenceOutfile, tolerance)                
         self.assertTrue(out, "msg='{0}', ref='{1}', tmp='{2}'".format(msg, referenceOutfile, tmpOutfile))
 
+    def test_two(self):
+        '''
+        Lock in results on arbitrary data -- because meaningful runs take too long to run.
+        '''
+        fn = "two.txt"
+        logging.info(fn)
+        tmpOutfile = self.file_name(fn)
+
+        snpreader = self.snpreader_whole[:10,:]
+
+        spatial_coor = [[i,-i] for i in xrange(snpreader.iid_count)]
+        alpha_list = alpha_list_big=[int(v) for v in np.logspace(2,np.log10(4000), 2)]
+        dataframe = heritability_spatial_correction(snpreader,spatial_coor,snpreader.iid,alpha_list,self.pheno_whole,jackknife_count=2,permute_plus_count=1,permute_times_count=1,just_testing=False)
+
+        dataframe.to_csv(tmpOutfile,sep="\t",index=False)
+        referenceOutfile = TestFeatureSelection.reference_file("heritability_spatial_correction/"+fn)
+        out,msg=ut.compare_files(tmpOutfile, referenceOutfile, tolerance)                
+        self.assertTrue(out, "msg='{0}', ref='{1}', tmp='{2}'".format(msg, referenceOutfile, tmpOutfile))
 
 
     def test_doctest(self):

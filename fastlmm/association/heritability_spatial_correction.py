@@ -398,7 +398,7 @@ def heritability_spatial_correction(snps_kernel, spatial_coor, spatial_iid, alph
         real_result_permtimes.set_index(['phen'],inplace=True)
 
         # Create a table of the permutation runs and add the real nLL to reach row
-        summary_permtimes_table_fn = "summary.permutation.GxE.{0}.count{1}.txt".format(len(permtimes_phenotypes), len(permute_times_list)-1)
+        summary_permtimes_table_fn = "summary.permutation.GxE.{0}.count{1}.txt".format(len(permtimes_phenotypes), permute_times_count)
 
         perm_table = permtimes_table[permtimes_table.permute_times_index!=-1]
         resultx = perm_table.join(real_result_permtimes, on='phen')
