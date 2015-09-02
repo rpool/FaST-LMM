@@ -15,8 +15,6 @@ from fastlmm.inference.lmm_cov import LMM as fastLMM
 from fastlmm.inference.lmm import LMM
 import sklearn.metrics
 from pysnptools.snpreader import Pheno
-from pysnptools.util import intersect_apply
-from fastlmm.association.fastlmmmodel import _kernel_fixup, _pheno_fixup
 from pysnptools.standardizer import Unit
 import itertools
 from sklearn import cross_validation
@@ -34,10 +32,21 @@ def _write_csv(dataframe, index, filename):
     logging.info(filename)
     logging.info(dataframe)
 
-def pairwise_distance(xy_coor, alpha):     # scale xy coordinates
-    return np.exp(-sklearn.metrics.pairwise_distances(xy_coor) / float(alpha))
+def spatial_similarity(spatial_coor, alpha):     # scale spatial coordinates
+    """
+    :param spatial_coor: The position of each individual given by two coordinates. Any units are allowed, but the two values
+       must be compatible so that distance can be determined via Pythagoras' theorem. (So, longitude and latitude should
+       not be used unless the locations are near the Equator.) 
+    :type spatial_coor: a iid_count x 2 array
 
-def _run_line(arg_tuple):               
+    :param alpha: a similarity scale. The similarity of two individuals is defined as exp(-distance_between/alpha).
+    :type alpha: number
+
+    :rtype: square numpy array of similarities.
+    """
+    return np.exp(-sklearn.metrics.pairwise_distances(spatial_coor) / float(alpha))
+
+def work_item(arg_tuple):               
     (pheno, G_kernel, spatial_coor, spatial_iid, alpha,                          # The main inputs
      (jackknife_index, jackknife_count, jackknife_seed),               # Jackknifing and permutations inputs
      (permute_plus_index, permute_plus_count, permute_plus_seed),
@@ -51,14 +60,15 @@ def _run_line(arg_tuple):
     pheno = pheno[pheno.val[:,0]==pheno.val[:,0],:] #Excludes NaN because NaN is not equal to NaN
 
     #########################################
-    # Environment: Turn xy info info a KernelData
+    # Environment: Turn spatial info info a KernelData
     #########################################
-    xy_val = pairwise_distance(spatial_coor, alpha)
-    E_kernel = KernelData(iid=spatial_iid,val=xy_val)
+    spatial_val = spatial_similarity(spatial_coor, alpha)
+    E_kernel = KernelData(iid=spatial_iid,val=spatial_val)
 
     #########################################
     # Intersect, apply the jackknife or permutation, and then (because we now know the iids) standardize appropriately
     #########################################
+    from pysnptools.util import intersect_apply
     G_kernel, E_kernel, pheno  = intersect_apply([G_kernel, E_kernel, pheno])
 
     if jackknife_index >= 0:
@@ -175,18 +185,72 @@ def _run_line(arg_tuple):
     logging.info("run_line: {0}".format(ret))
     return ret
 
-def heritability_spatial_correction(snps_kernel, spatial_coor, spatial_iid, alpha_list, pheno, 
+def heritability_spatial_correction(G_kernel, spatial_coor, spatial_iid, alpha_list, pheno, 
                      map_function = map, cache_folder=None, 
                      jackknife_count=500, permute_plus_count=10000, permute_times_count=10000, seed=0,
                      just_testing=False
                      ):
+    """
+    Function measuring heritability with correction for spatial location.
+
+    :param G_kernel: A kernel that tells the genetic similarity between all pairs of individuals. The kernel can be given 
+      explicitly, for example with a :class:`.KernelData`. The kernel can also be given implicitly by providing a set of
+      SNPs or the name of a BED file.
+    :type G_kernel: a :class:`.KernelReader`, :class:`.SnpReader` or a string
+
+    :param spatial_coor: The position of each individual given by two coordinates. Any units are allowed, but the two values
+       must be compatible so that distance can be determined via Pythagoras' theorem. (So, longitude and latitude should
+       not be used unless the locations are near the Equator.) 
+    :type spatial_coor: a iid_count x 2 array
+
+    :param spatial_iid: A ndarray of the iids. Each iid is a ndarray of two strings (a family ID and a case ID) that identifies an individual.
+    :type spatial_iid: array of strings with shape [iid_count,2]
+
+    :param alpha_list: a list of numbers to search to find the best alpha, which is the similarity scale. The similarity of two individuals
+      is here defined as exp(-distance_between/alpha). If the closest individuals are 100 units apart and the farthest
+      individuals are 4e6 units apart, a reasonable alpha_list might be: [int(v) for v in np.logspace(np.log10(100),np.log10(1e10), 100)]
+      The function's reports on the alphas chosen. If an extreme alpha is picked, change alpha_list to cover more range.
+    :type alpha_list: list of numbers
+
+    :param pheno: The target values(s) to predict. It can be a file name readable via :class:`SnpReader.Pheno` or any :class:`.SnpReader`.
+    :type pheno: a :class:`.SnpReader` or string
+
+    :param cache_folder: (default 'None') The name of a directory in which to save intermediate results. If 'None', then no intermediate results are saved.
+    :type cache_folder: a string
+
+    :param map_function: (default 'map') A function with the same inputs and functionality as Python's 'map' function.
+       Can be used to run 'heritability_spatial_correction' on a cluster.
+    :type map_function: a function
+
+    :param jackknife_count: (default 500) The number of jackknife groups to use when calculating standard errors (SE). Changing to a small number, 2, 
+       speeds up calculation at the cost of unusable SEs.
+    :type jackknife_count: number
+
+    :param permute_plus_count: (default 10000) The number of permutations used when calculating P values. Changing to a small number, 1, 
+       speeds up calculation at the cost of unusable P values.
+    :type permute_plus_count: number
+
+    :param permute_times_count: (default 10000) The number of permutations used when calculating P values. Changing to a small number, 1, 
+       speeds up calculation at the cost of unusable P values.
+    :type permute_times_count: number
+
+    :param seed: (default 0) The random seed used by jackknifing and permutation.
+    :type seed: number
+
+    :param just_testing: (default False) If true, skips actual LMM-related search and calculation.
+    :type just_testing: bool
+
+    :rtype: Pandas dataframe with one row per phenotyper. Columns include "h2uncorr", "h2corr", etc.
+
+    """
 
     ######################
     # Prepare the inputs
     ######################
 
-    snps_kernel = _kernel_fixup(snps_kernel, iid_if_none=None, standardizer=Unit())  # Create a kernel from an in-memory kernel, some snps, or a text file.
-    pheno = _pheno_fixup(pheno,iid_if_none=snps_kernel.iid, missing='NA') # Create phenotype data from in-memory data or a text file.
+    from fastlmm.association.fastlmmmodel import _kernel_fixup, _pheno_fixup
+    G_kernel = _kernel_fixup(G_kernel, iid_if_none=None, standardizer=Unit())  # Create a kernel from an in-memory kernel, some snps, or a text file.
+    pheno = _pheno_fixup(pheno,iid_if_none=G_kernel.iid, missing='NA') # Create phenotype data from in-memory data or a text file.
 
     if cache_folder is not None:
         pstutil.create_directory_if_necessary(cache_folder,isfile=False)
@@ -210,14 +274,14 @@ def heritability_spatial_correction(snps_kernel, spatial_coor, spatial_iid, alph
         for phen_target in pheno.sid:
             pheno_one = pheno[:,pheno.col_to_index([phen_target])] # Look at only this pheno_target
             for alpha in alpha_list:
-                            #pheno, G_kernel, xy_coor, xy_iid, alpha, (jackknife_index, jackknife_count, jackknife_seed),
-                arg_tuple = (pheno_one, snps_kernel, spatial_coor, spatial_iid, alpha, (-1,     0,     None),  
+                            #pheno, G_kernel, spatial_coor, spatial_iid, alpha, (jackknife_index, jackknife_count, jackknife_seed),
+                arg_tuple = (pheno_one, G_kernel, spatial_coor, spatial_iid, alpha, (-1,     0,     None),  
                              # (permute_plus_index, permute_plus_count, permute_plus_seed), (permute_times_index, permute_times_count, permute_times_seed) ,just_testing, do_uncorr, do_gxe2, a2
                                (-1,     0,     None),                                       (-1,     0,     None),                                          just_testing, False,     True,   None)
                 arg_list.append(arg_tuple)
 
         # Run "run_line" on each set of arguments and save to file
-        return_list = map_function(_run_line, arg_list)
+        return_list = map_function(work_item, arg_list)
         return_list = [line for line in return_list if line is not None] #Remove 'None' results
         alpha_table = pd.DataFrame(return_list)
         if cache_folder is not None:
@@ -239,7 +303,7 @@ def heritability_spatial_correction(snps_kernel, spatial_coor, spatial_iid, alph
     # Use jackknifing to compute h2uncorr, SE, h2corr, SE, e2, SE, gxe2, SE
     ######################
 
-    jackknife_count_actual = min(jackknife_count,snps_kernel.iid_count)
+    jackknife_count_actual = min(jackknife_count,G_kernel.iid_count)
 
     # Set up the run and do it (unless it has already been run)
     jackknife_table_fn = "{0}/jackknife.{1}.count{2}.txt".format(cache_folder, pheno.sid_count, jackknife_count_actual)
@@ -256,14 +320,14 @@ def heritability_spatial_correction(snps_kernel, spatial_coor, spatial_iid, alph
                 do_uncorr = (alpha == alpha_corr)
                 do_gxe2   = (alpha == alpha_gxe2)
                 for jackknife in range(-1, jackknife_count_actual):
-                               # pheno, G_kernel, xy_coor, xy_iid, alpha, (jackknife_index, jackknife_count,         jackknife_seed),
-                    arg_tuple = (pheno_one, snps_kernel, spatial_coor, spatial_iid, alpha, (jackknife,       jackknife_count_actual,  jackknife_seed),
+                               # pheno, G_kernel, spatial_coor, spatial_iid, alpha, (jackknife_index, jackknife_count,         jackknife_seed),
+                    arg_tuple = (pheno_one, G_kernel, spatial_coor, spatial_iid, alpha, (jackknife,       jackknife_count_actual,  jackknife_seed),
                                     # (permute_plus_index, permute_plus_count, permute_plus_seed), (permute_times_index, permute_times_count, permute_times_seed) ,just_testing, do_uncorr, do_gxe2, a2
                                     (-1,0,None),                                                 (-1,0,None),                                                    just_testing, do_uncorr, do_gxe2, None)
                     arg_list.append(arg_tuple)    
 
         # Run "run_line" on each set of arguments and save to file
-        return_list = map_function(_run_line, arg_list)
+        return_list = map_function(work_item, arg_list)
         return_list = [line for line in return_list if line is not None] #Remove 'None' results
         jackknife_table = pd.DataFrame(return_list)
         if cache_folder is not None:
@@ -325,14 +389,14 @@ def heritability_spatial_correction(snps_kernel, spatial_coor, spatial_iid, alph
             pheno_one = pheno[:,pheno.col_to_index([phen_target])] # Look at only this pheno_target
             alpha_corr, alpha_gxe2 = alpha_dict[phen_target]
             for jackknife_index in range(-1,permute_plus_count):
-                           # pheno, G_kernel, xy_coor, xy_iid, alpha,      (jackknife_index, jackknife_count, jackknife_seed),
-                arg_tuple = (pheno_one, snps_kernel, spatial_coor, spatial_iid, alpha_corr, (-1,0,None),
+                           # pheno, G_kernel, spatial_coor, spatial_iid, alpha,      (jackknife_index, jackknife_count, jackknife_seed),
+                arg_tuple = (pheno_one, G_kernel, spatial_coor, spatial_iid, alpha_corr, (-1,0,None),
                              # (permute_plus_index, permute_plus_count, permute_plus_seed), (permute_times_index, permute_times_count, permute_times_seed) ,just_testing, do_uncorr, do_gxe2, a2
                              (jackknife_index, permute_plus_count,permute_plus_seed),       (-1,0,None),                                                    just_testing, False,    False,    None)
                 arg_list.append(arg_tuple)
 
         # Run "run_line" on each set of arguments and save to file
-        return_list = map_function(_run_line, arg_list)
+        return_list = map_function(work_item, arg_list)
         return_list = [line for line in return_list if line is not None] #Remove 'None' results
         permplus_table = pd.DataFrame(return_list)
         if cache_folder is not None:
@@ -373,14 +437,14 @@ def heritability_spatial_correction(snps_kernel, spatial_coor, spatial_iid, alph
             alpha_corr, alpha_gxe2 = alpha_dict[phen_target]
             a2 = float(permplus_table[permplus_table.phen==phen_target][permplus_table.permute_plus_index == -1]['a2'])
             for permute_index in range(-1,permute_times_count):
-                           # pheno, G_kernel, xy_coor, xy_iid, alpha,      (permute_index, permute_count, permute_seed),
-                arg_tuple = (pheno_one, snps_kernel, spatial_coor, spatial_iid, alpha_gxe2, (-1,0,None),
+                           # pheno, G_kernel, spatial_coor, spatial_iid, alpha,      (permute_index, permute_count, permute_seed),
+                arg_tuple = (pheno_one, G_kernel, spatial_coor, spatial_iid, alpha_gxe2, (-1,0,None),
                              # (permute_plus_index, permute_plus_count, permute_plus_seed), (permute_times_index, permute_times_count, permute_times_seed) ,just_testing, do_uncorr, do_gxe2, a2
                             (-1,0,None),                                                    (permute_index, permute_times_count,permute_times_seed),        just_testing, False,     True,    a2)
                 arg_list.append(arg_tuple)    
 
             # Run "run_line" on each set of arguments and save to file
-            return_list = map_function(_run_line, arg_list)
+            return_list = map_function(work_item, arg_list)
             return_list = [line for line in return_list if line is not None] #Remove 'None' results
             permtime_results = pd.DataFrame(return_list)
             if cache_folder is not None:

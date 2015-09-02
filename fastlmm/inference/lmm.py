@@ -165,13 +165,8 @@ class LMM(object):
             self.a2 = a2
             pass
         else:#rank of kernel = 0 (linear regression case)
-            #self.S = SP.zeros((0))
-            #self.U = SP.zeros_like(self.G)
-            #!!!new code - check it some more
-            # If there are no SNPs then assume that everyone is completely related to themselves and completely unrelated to anyone else
-            # that is K is the identity matrix and there for U is too and S is all ones
-            self.S = SP.ones((N))
-            self.U = SP.eye(N) #!!!cmk Isn't this a waste of memory? Is there a way to do it with less? Also, should the # of eigenvalues be <= len(G)?????
+            self.S = SP.zeros((0))
+            self.U = SP.zeros_like(self.G)
 
 
     def setK(self, K0, K1=None, a2=0.0):
@@ -635,7 +630,7 @@ class LMM(object):
         if delta is not None:
             Sd = (self.S+delta)*scale
         else:
-            #assert False, "not implemented (UKstar needs to be scaled by h2)"
+            assert False, "not implemented (UKstar needs to be scaled by h2)"
             Sd = (h2*self.S + (1.0-h2))*scale
 
         if len(self.exclude_idx) > 0:
@@ -707,24 +702,24 @@ class LMM(object):
         ystar = yfixed + yrandom
         return ystar
 
-    def predict_mean_and_variance(self, beta, sigma2, h2, Kstar_star):
-        assert 0 <= h2 and h2 <= 1, "By definition, h2 must be between 0 and 1 (inclusive)"
-        varg = h2 * sigma2
-        vare = (1.-h2) * sigma2
-        K = np.dot(np.dot(self.U,np.eye(len(self.U)) * self.S),self.U.T) #Re-compose the Eigen value decomposition #!!!don't leave it like this
-        V = varg * K + vare * np.eye(len(K))
-        Vinv = LA.inv(V)
+    #def predict_mean_and_variance(self, beta, sigma2, h2, Kstar_star):
+    #    assert 0 <= h2 and h2 <= 1, "By definition, h2 must be between 0 and 1 (inclusive)"
+    #    varg = h2 * sigma2
+    #    vare = (1.-h2) * sigma2
+    #    K = np.dot(np.dot(self.U,np.eye(len(self.U)) * self.S),self.U.T) #Re-compose the Eigen value decomposition #!!!don't leave it like this
+    #    V = varg * K + vare * np.eye(len(K))
+    #    Vinv = LA.inv(V)
 
-        a = np.dot(varg * self.Kstar, Vinv)
+    #    a = np.dot(varg * self.Kstar, Vinv)
 
-        y_star = np.dot(self.Xstar,beta) + np.dot(a, self.y-SP.dot(self.X,beta)) #!!!cmk shouldn't the 2nd dot be precomputed?
-        y_star = y_star.reshape(-1,1) #Make 2-d
+    #    y_star = np.dot(self.Xstar,beta) + np.dot(a, self.y-SP.dot(self.X,beta)) #!!!cmk shouldn't the 2nd dot be precomputed?
+    #    y_star = y_star.reshape(-1,1) #Make 2-d
 
-        var_star = (varg * Kstar_star + 
-                    vare * np.eye(len(Kstar_star)) -
-                    np.dot(a,
-                            (varg * self.Kstar.T)))
-        return y_star, var_star
+    #    var_star = (varg * Kstar_star + 
+    #                vare * np.eye(len(Kstar_star)) -
+    #                np.dot(a,
+    #                        (varg * self.Kstar.T)))
+    #    return y_star, var_star
 
     def predictVariance(self, h2=0.0, logdelta = None, delta = None, sigma2 = 1.0, Kstar_star = None):
         '''

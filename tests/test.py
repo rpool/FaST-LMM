@@ -135,6 +135,7 @@ if __name__ == '__main__':
     import fastlmm.association.tests.test_single_snp
     import fastlmm.association.tests.test_snp_set
     import fastlmm.association.tests.test_gwas
+    import fastlmm.association.tests.test_heritability_spatical_correction
     import fastlmm.util.testdistributable
     import fastlmm.util.test
 
@@ -147,6 +148,7 @@ if __name__ == '__main__':
                                     fastlmm.association.tests.test_single_snp.getTestSuite(),
                                     fastlmm.association.tests.testepistasis.getTestSuite(),
                                     fastlmm.association.tests.test_snp_set.getTestSuite(),
+                                    fastlmm.association.tests.test_gwas.getTestSuite(),
                                     fastlmm.association.tests.test_gwas.getTestSuite(),
                                     fastlmm.util.testdistributable.getTestSuite(),
                                     fastlmm.feature_selection.test.getTestSuite(),

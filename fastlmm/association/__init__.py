@@ -3,5 +3,6 @@ from fastlmm.association.single_snp import single_snp
 from fastlmm.association.single_snp import single_snp_leave_out_one_chrom
 from fastlmm.association.snp_set import snp_set
 from fastlmm.association.epistasis import epistasis
-#!!!cmk add this from fastlmm.association.fastlmmmodel import FastLmmModel
+from fastlmm.association.heritability_spatial_correction import heritability_spatial_correction
+
 

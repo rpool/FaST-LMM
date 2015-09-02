@@ -18,7 +18,7 @@ import ctypes
 import datetime
 from tempfile import TemporaryFile
 
-#!!!cmk currently any output files should be in the home directory, e.g. "aric.depnet.txt" not r"tempout\aric.depnet.txt". Fix this.
+#!!! currently any output files should be in the home directory, e.g. "aric.depnet.txt" not r"tempout\aric.depnet.txt". Fix this.
 class Hadoop2: # implements IRunner
 
     fileshare = "/user"
@@ -351,7 +351,7 @@ class ListCopier(object): #Implements ICopier
 
     def input(self,item):
         if isinstance(item, str):
-            #!!!cmk item = item.replace('\\','/') # replace any backslashes in the file names with forward slashes.
+            #!!! item = item.replace('\\','/') # replace any backslashes in the file names with forward slashes.
             self.inputList.append(item)
         elif hasattr(item,"copyinputs"):
             item.copyinputs(self)
@@ -360,7 +360,7 @@ class ListCopier(object): #Implements ICopier
 
     def output(self,item):
         if isinstance(item, str):
-            #!!!cmk item = item.replace('\\','/') # replace any backslashes in the file names with forward slashes.
+            #!!! item = item.replace('\\','/') # replace any backslashes in the file names with forward slashes.
             self.outputList.append(item)
         elif hasattr(item,"copyoutputs"):
             item.copyoutputs(self)

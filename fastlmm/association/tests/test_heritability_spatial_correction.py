@@ -16,7 +16,7 @@ from fastlmm.feature_selection.test import TestFeatureSelection
 tolerance = 1e-4
 
 
-class TestHeritabilitySpatialCorrection(unittest.TestCase): #!!!cmk run these
+class TestHeritabilitySpatialCorrection(unittest.TestCase):
 
     @classmethod
     def setUpClass(self):
@@ -46,7 +46,7 @@ class TestHeritabilitySpatialCorrection(unittest.TestCase): #!!!cmk run these
         pheno = SnpData(iid=self.pheno_whole.iid,sid=["pheno0","pheno1"],val=np.c_[half,half])
 
         spatial_coor = [[i,-i] for i in xrange(self.snpreader_whole.iid_count)]
-        alpha_list = alpha_list_big=[int(v) for v in np.logspace(2,np.log10(4000), 2)] #!!!cmk make smaller than 5
+        alpha_list = alpha_list_big=[int(v) for v in np.logspace(2,np.log10(4000), 2)]
         dataframe = heritability_spatial_correction(self.snpreader_whole,spatial_coor,self.snpreader_whole.iid,alpha_list,pheno,jackknife_count=2,permute_plus_count=1,permute_times_count=1,just_testing=True)
 
         dataframe.to_csv(tmpOutfile,sep="\t",index=False)
@@ -85,7 +85,6 @@ class TestHeritabilitySpatialCorrection(unittest.TestCase): #!!!cmk run these
 
 def getTestSuite():
     
-    #!!!cmk add these to fastlmm main testing code
     suite1 = unittest.TestLoader().loadTestsFromTestCase(TestHeritabilitySpatialCorrection)
     return unittest.TestSuite([suite1])
 
@@ -98,22 +97,6 @@ if __name__ == '__main__':
     from fastlmm.association.tests.test_heritability_spatical_correction import TestHeritabilitySpatialCorrection
     suites = unittest.TestSuite([getTestSuite()])
 
-    if True: #Standard test run #!!!cmk
-        r = unittest.TextTestRunner(failfast=True) #!!!cmk fail fast=False
-        r.run(suites)
-    else: #Cluster test run
-        from fastlmm.util.distributabletest import DistributableTest
-
-        runner = HPC(10, 'RR1-N13-09-H44',r'\\msr-arrays\Scratch\msr-pool\Scratch_Storage4\Redmond',
-                     remote_python_parent=r"\\msr-arrays\Scratch\msr-pool\Scratch_Storage4\REDMOND\carlk\Source\carlk\july_7_14\tests\runs\2014-07-24_15_02_02_554725991686\pythonpath",
-                     update_remote_python_parent=True,
-                     priority="AboveNormal",mkl_num_threads=1)
-        runner = Local()
-        #runner = LocalMultiProc(taskcount=20,mkl_num_threads=5)
-        #runner = LocalInParts(1,2,mkl_num_threads=1) # For debugging the cluster runs
-        #runner = Hadoop(100, mapmemory=8*1024, reducememory=8*1024, mkl_num_threads=1, queue="default")
-        distributable_test = DistributableTest(suites,"temp_test")
-        print runner.run(distributable_test)
-
-
+    r = unittest.TextTestRunner(failfast=False)
+    r.run(suites)
     logging.info("done with testing")
