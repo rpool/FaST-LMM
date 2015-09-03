@@ -54,6 +54,9 @@
     <Compile Include="epistasis.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="fastlmmmodel.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="gwas.py" />
     <Compile Include="heritability_spatial_correction.py">
       <SubType>Code</SubType>
@@ -76,7 +79,6 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="tests\test_heritability_spatial_correction.py" />
-    <Compile Include="tests\test_fastlmmmodel.py" />
     <Compile Include="tests\test_snp_set.py" />
     <Compile Include="tests\test_single_snp.py">
       <SubType>Code</SubType>

@@ -133,7 +133,7 @@ def f_regression_cov_alt(X, y, C):
     y.flags.writeable = False
 
 
-    #X, C, y = check_arrays(X, C, y, dtype=np.float)
+    #X, C, y = check_array(X, C, y, dtype=np.float)
     y = y.ravel()
 
     # make copy of input data
@@ -202,9 +202,9 @@ def f_regression_cov(X, y, C):
         p-values of F-scores.
     """
 
-    X = check_arrays(X, dtype=np.float)
-    C = check_arrays(C, dtype=np.float)
-    y = check_arrays(y, dtype=np.float)    
+    X = check_array(X, dtype=np.float)
+    C = check_array(C, dtype=np.float)
+    y = check_array(y, dtype=np.float)    
     y = y.ravel()
 
     assert C.shape[1] < C.shape[0]

@@ -83,7 +83,7 @@ def work_item(arg_tuple):
     if permute_plus_index >= 0:
         #We shuffle the val, but not the iid, because that would cancel out.
         #Integrate the permute_plus_index into the random.
-        np.random.seed = (permute_plus_seed + permute_plus_index)%4294967295
+        np.random.seed((permute_plus_seed + permute_plus_index)%4294967295)
         new_index = np.arange(G_kernel.iid_count)
         np.random.shuffle(new_index)
         E_kernel_temp = E_kernel[new_index].read()
@@ -151,7 +151,7 @@ def work_item(arg_tuple):
         val=G_kernel.val * E_kernel.val
         if permute_times_index >= 0:
             #We shuffle the val, but not the iid, because doing both would cancel out
-            np.random.seed = (permute_times_seed + permute_times_index)%4294967295
+            np.random.seed((permute_times_seed + permute_times_index)%4294967295)
             new_index = np.arange(G_kernel.iid_count)
             np.random.shuffle(new_index)
             val = pstutil.sub_matrix(val, new_index, new_index)
