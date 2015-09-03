@@ -712,7 +712,7 @@ class LMM(object):
 
     #    a = np.dot(varg * self.Kstar, Vinv)
 
-    #    y_star = np.dot(self.Xstar,beta) + np.dot(a, self.y-SP.dot(self.X,beta)) #!!!cmk shouldn't the 2nd dot be precomputed?
+    #    y_star = np.dot(self.Xstar,beta) + np.dot(a, self.y-SP.dot(self.X,beta)) #!!! shouldn't the 2nd dot be precomputed?
     #    y_star = y_star.reshape(-1,1) #Make 2-d
 
     #    var_star = (varg * Kstar_star + 

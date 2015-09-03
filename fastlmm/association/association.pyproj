@@ -105,6 +105,9 @@
     <Content Include="..\..\doc\ipynb\FaST-LMM.ipynb">
       <Link>docsource\FaST-LMM.ipynb</Link>
     </Content>
+    <Content Include="..\..\doc\ipynb\heritability.ipynb">
+      <Link>docsource\heritability.ipynb</Link>
+    </Content>
     <Content Include="..\..\doc\make.bat">
       <Link>docsource\make.bat</Link>
     </Content>
