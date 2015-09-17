@@ -15,9 +15,8 @@ import logging
 
 class HPC: # implements IRunner
     #!!LATER make it (and Hadoop) work from root directories -- or give a clear error message
-    def __init__(self, taskcount, clustername, fileshare, priority="Normal", unit="core", mkl_num_threads=None,
-                 remote_python_parent=None,
-                update_remote_python_parent=False, min=None, max=None, excluded_nodes=[], template=None, skipinputcopy=False, logging_handler=logging.StreamHandler(sys.stdout)):
+    def __init__(self, taskcount, clustername, fileshare, priority="Normal", unit="core", mkl_num_threads=None, runtime="infinite", remote_python_parent=None,
+                update_remote_python_parent=False, min=None, max=None, excluded_nodes=[], template=None, nodegroups=None, skipinputcopy=False, logging_handler=logging.StreamHandler(sys.stdout)):
         logger = logging.getLogger()
         if not logger.handlers:
             logger.setLevel(logging.INFO)
@@ -32,6 +31,7 @@ class HPC: # implements IRunner
         self.fileshare = fileshare
 
         self.priority = priority
+        self.runtime = runtime
         self.unit = unit
         self.excluded_nodes = excluded_nodes
         self.min = min
@@ -41,6 +41,7 @@ class HPC: # implements IRunner
         self.CheckUnitAndMKLNumThreads(mkl_num_threads, unit)
         self.skipinputcopy=skipinputcopy
         self.template = template
+        self.nodegroups = nodegroups
       
     def run(self, distributable):
         # Check that the local machine has python path set
@@ -141,7 +142,7 @@ class HPC: # implements IRunner
         with open(psfilename_abs, "w") as psfile:
             psfile.write(r"""Add-PsSnapin Microsoft.HPC
         Set-Content Env:CCP_SCHEDULER {0}
-        $r = New-HpcJob -Name "{7}" -Priority {8}{12}{14}
+        $r = New-HpcJob -Name "{7}" -Priority {8}{12}{14}{16} -RunTime {15}
         $r.Id
         Add-HpcTask -Name Parametric -JobId $r.Id -Parametric -Start 0 -End {1} -CommandLine "{6} * {5}" -StdOut "{2}\*.txt" -StdErr "{3}\*.txt" -WorkDir {4}
         Add-HpcTask -Name Reduce -JobId $r.Id -Depend Parametric -CommandLine "{6} {5} {5}" -StdOut "{2}\reduce.txt" -StdErr "{3}\reduce.txt" -WorkDir {4}
@@ -182,7 +183,9 @@ class HPC: # implements IRunner
                                 "}",                #11
                                 self.numString(),   #12
                                 excluded_nodes,     #13
-                                ' -templateName "{0}"'.format(self.template) if self.template is not None else "" #14
+                                ' -templateName "{0}"'.format(self.template) if self.template is not None else "", #14
+                                self.runtime,            #15 RuntimeSeconds
+                                ' -NodeGroups "{0}"'.format(self.nodegroups) if self.nodegroups is not None else "" #16
                                 ))
 
         import subprocess

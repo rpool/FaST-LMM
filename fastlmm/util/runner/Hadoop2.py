@@ -195,7 +195,7 @@ class Hadoop2: # implements IRunner
         #if stderr != "" : raise Exception("Stderr from command: '{0}'".format(stderr))
 
     def FindOrCreatePythonSettings(self, remotewd):
-        localpythonpathsetting = r"\\GCR\Scratch\RR1\eScience\.continuum" # os.path.join(os.environ.get("userprofile"),".continuum")
+        localpythonpathsetting = r"\\GCR\Scratch\B99\eScience\.continuum" # os.path.join(os.environ.get("userprofile"),".continuum")
         lastFolderName = os.path.split(os.path.normpath(localpythonpathsetting))[1]
         #util.create_directory_if_necessary(localpythonpathsetting,isfile=False)
 

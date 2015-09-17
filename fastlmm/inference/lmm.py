@@ -287,7 +287,7 @@ class LMM(object):
             res = self.nLLeval(h2=x,**kwargs)
             if (resmin[0] is None) or (res['nLL']<resmin[0]['nLL']):
                 resmin[0]=res
-            logging.debug("search\t{0}\t{1}".format(x,res['nLL']))
+            #logging.debug("search\t{0}\t{1}".format(x,res['nLL']))
             return res['nLL']
         min = minimize1D(f=f, nGrid=nGridH2, minval=minH2, maxval=maxH2 )
         return resmin[0]

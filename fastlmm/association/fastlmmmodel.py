@@ -14,6 +14,7 @@ from fastlmm.inference.lmm import LMM
 from pysnptools.util import intersect_apply
 from pysnptools.snpreader import SnpData,SnpReader
 from pysnptools.standardizer import Unit
+from pysnptools.kernelreader import KernelNpz
 
 def _snps_fixup(snp_input, iid_if_none=None):
     if isinstance(snp_input, str):
@@ -27,7 +28,7 @@ def _snps_fixup(snp_input, iid_if_none=None):
 def _pheno_fixup(pheno_input, iid_if_none=None, missing ='-9'):
 
     try:
-        ret = Pheno(pheno_input, iid_if_none)
+        ret = Pheno(pheno_input, iid_if_none, missing=missing)
         ret.iid #doing this just to force file load
         return ret
     except:

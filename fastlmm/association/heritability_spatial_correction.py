@@ -188,7 +188,7 @@ def work_item(arg_tuple):
 def heritability_spatial_correction(G_kernel, spatial_coor, spatial_iid, alpha_list, pheno, 
                      map_function = map, cache_folder=None, 
                      jackknife_count=500, permute_plus_count=10000, permute_times_count=10000, seed=0,
-                     just_testing=False
+                     just_testing=False,  always_remote=False
                      ):
     """
     Function measuring heritability with correction for spatial location.
@@ -281,7 +281,7 @@ def heritability_spatial_correction(G_kernel, spatial_coor, spatial_iid, alpha_l
                 arg_list.append(arg_tuple)
 
         # Run "run_line" on each set of arguments and save to file
-        return_list = map_function(work_item, arg_list)
+        return_list = map_function(work_item, arg_list) if len(arg_list)>1 or always_remote else map(work_item, arg_list)
         return_list = [line for line in return_list if line is not None] #Remove 'None' results
         alpha_table = pd.DataFrame(return_list)
         if cache_folder is not None:
@@ -327,7 +327,7 @@ def heritability_spatial_correction(G_kernel, spatial_coor, spatial_iid, alpha_l
                     arg_list.append(arg_tuple)    
 
         # Run "run_line" on each set of arguments and save to file
-        return_list = map_function(work_item, arg_list)
+        return_list = map_function(work_item, arg_list) if len(arg_list)>1 or always_remote else map(work_item, arg_list)
         return_list = [line for line in return_list if line is not None] #Remove 'None' results
         jackknife_table = pd.DataFrame(return_list)
         if cache_folder is not None:
@@ -396,7 +396,7 @@ def heritability_spatial_correction(G_kernel, spatial_coor, spatial_iid, alpha_l
                 arg_list.append(arg_tuple)
 
         # Run "run_line" on each set of arguments and save to file
-        return_list = map_function(work_item, arg_list)
+        return_list = map_function(work_item, arg_list) if len(arg_list)>1 or always_remote else map(work_item, arg_list)
         return_list = [line for line in return_list if line is not None] #Remove 'None' results
         permplus_table = pd.DataFrame(return_list)
         if cache_folder is not None:
@@ -444,7 +444,7 @@ def heritability_spatial_correction(G_kernel, spatial_coor, spatial_iid, alpha_l
                 arg_list.append(arg_tuple)    
 
             # Run "run_line" on each set of arguments and save to file
-            return_list = map_function(work_item, arg_list)
+            return_list = map_function(work_item, arg_list) if len(arg_list)>1 or always_remote else map(work_item, arg_list)
             return_list = [line for line in return_list if line is not None] #Remove 'None' results
             permtime_results = pd.DataFrame(return_list)
             if cache_folder is not None:
