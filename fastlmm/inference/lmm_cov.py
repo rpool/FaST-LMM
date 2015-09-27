@@ -488,9 +488,13 @@ class LMM(object):
 						resmin[0]['h2'][i] = res['h2']
 			#logging.info("search\t{0}\t{1}".format(x,res['nLL']))
 			return res['nLL']
-		(evalgrid,resultgrid) = evalgrid1D(f, evalgrid = None, nGrid=nGridH2, minval=minH2, maxval = maxH2, dimF=self.Y.shape[1])
-		#import ipdb;ipdb.set_trace()
-		return resmin[0], evalgrid, resultgrid
+		(grid,neg_logp) = evalgrid1D(f, evalgrid = None, nGrid=nGridH2, minval=minH2, maxval = maxH2, dimF=self.Y.shape[1])
+		
+		logp = -neg_logp
+		post_h2 = np.exp(logp-logp.max())/np.exp(logp-logp.max()).sum()*logp.shape[0]
+		h2_mean = (np.exp(logp-logp.max())*grid[:,np.newaxis]).sum()/np.exp(logp-logp.max()).sum()
+		h2_var = (np.exp(logp-logp.max())*(grid[:,np.newaxis] - h2_mean)**2.0).sum()/np.exp(logp-logp.max()).sum()
+		return resmin[0], grid, resultgrid, post_h2, h2_mean, h2_var
 
 	def nLLeval_2K(self, h2=0.0, h2_1=0.0, dof=None, scale=1.0, penalty=0.0, snps=None, UW=None, UUW=None, i_up=None, i_G1=None, subset=False):
 		'''
@@ -863,7 +867,10 @@ class Linreg(object):
             self.beta = Y.mean(0)
         else:        
             if self.Xdagger is None:
-                self.Xdagger = la.pinv(self.X)       #SVD-based, and seems fast
+            	if self.X.shape[1]:
+                	self.Xdagger = la.pinv(self.X)       #SVD-based, and seems fast
+                else:
+                	self.Xdagger = np.zeros_like(self.X.T)
             self.beta = self.Xdagger.dot(Y)
 
     def regress(self, Y):
