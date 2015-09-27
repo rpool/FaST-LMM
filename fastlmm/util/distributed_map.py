@@ -18,10 +18,11 @@ class DistributedMap(object): #implements IDistributable
     """
 
 
-    def __init__(self, function, input_args, input_files=None, output_files=None):
+    def __init__(self, function, input_args, input_files=None, output_files=None, name=None):
 
         self.function = function
         self.input_args = input_args
+        self.name = name
 
         if input_files is None:
             self.input_files = []
@@ -56,7 +57,7 @@ class DistributedMap(object): #implements IDistributable
 
     #optional override -- the str name of the instance is used by the cluster as the job name
     def __str__(self):
-        return "{0}".format(self.function.__name__)
+        return "{0}{1}".format(self.function.__name__, self.name or "" )
  #end of IDistributable interface---------------------------------------
 
     def dowork(self, i, input_args):
@@ -69,7 +70,7 @@ class DistributedMap(object): #implements IDistributable
     # required by IDistributable
     @property
     def tempdirectory(self):
-        return ".work_directory.None"
+        return ".work_directory.{0}".format(self.name)
         
 
     def copyinputs(self, copier):
@@ -84,7 +85,7 @@ class DistributedMap(object): #implements IDistributable
 
 
 
-def d_map(f, args, runner, input_files=None, output_files=None):
+def d_map(f, args, runner, input_files=None, output_files=None,name=None):
     """interface for parallelizing embarrasibly parallel code
     
     Parameters
@@ -109,7 +110,7 @@ def d_map(f, args, runner, input_files=None, output_files=None):
     if output_files is not None:
         raise NotImplementedError("output files are not implemented yet")
 
-    dist = distributed_map.DistributedMap(f, args, input_files, output_files)
+    dist = distributed_map.DistributedMap(f, args, input_files, output_files,name=name)
     result = runner.run(dist)
 
     assert len(result) == len(args)

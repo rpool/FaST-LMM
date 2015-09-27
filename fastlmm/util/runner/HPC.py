@@ -17,7 +17,7 @@ class HPC: # implements IRunner
     #!!LATER make it (and Hadoop) work from root directories -- or give a clear error message
     def __init__(self, taskcount, clustername, fileshare, priority="Normal", unit="core", mkl_num_threads=None,
                  remote_python_parent=None,
-                update_remote_python_parent=False, min=None, max=None, skipinputcopy=False, logging_handler=logging.StreamHandler(sys.stdout)):
+                update_remote_python_parent=False, min=None, max=None, excluded_nodes=[], template=None, skipinputcopy=False, logging_handler=logging.StreamHandler(sys.stdout)):
         logger = logging.getLogger()
         if not logger.handlers:
             logger.setLevel(logging.INFO)
@@ -33,17 +33,19 @@ class HPC: # implements IRunner
 
         self.priority = priority
         self.unit = unit
+        self.excluded_nodes = excluded_nodes
         self.min = min
         self.max = max
         self.remote_python_parent = remote_python_parent
         self.update_remote_python_parent = update_remote_python_parent
         self.CheckUnitAndMKLNumThreads(mkl_num_threads, unit)
         self.skipinputcopy=skipinputcopy
+        self.template = template
       
     def run(self, distributable):
         # Check that the local machine has python path set
         localpythonpath = os.environ.get("PYTHONPATH")#!!should it be able to work without pythonpath being set (e.g. if there was just one file)? Also, is None really the return or is it an exception.
-        if localpythonpath == None: raise Exception("Expect local machine to have 'pythonpath' set")
+        if localpythonpath is None: raise Exception("Expect local machine to have 'pythonpath' set")
 
         remotepythoninstall = self.check_remote_pythoninstall()
 
@@ -75,10 +77,10 @@ class HPC: # implements IRunner
 
     def CheckUnitAndMKLNumThreads(self, mkl_num_threads, unit):
         if unit.lower() == "core":
-            if mkl_num_threads!=None and mkl_num_threads!=1 : raise Exception("When 'unit' is 'core', mkl_num_threads must be unspecified or 1")
+            if mkl_num_threads is not None and mkl_num_threads!=1 : raise Exception("When 'unit' is 'core', mkl_num_threads must be unspecified or 1")
             self.mkl_num_threads = 1
         elif unit.lower() == "socket":
-            if mkl_num_threads ==None : raise Exception("When 'unit' is 'socket', mkl_num_threads must be specified")
+            if mkl_num_threads is None : raise Exception("When 'unit' is 'socket', mkl_num_threads must be specified")
             self.mkl_num_threads = mkl_num_threads
         elif unit.lower() == "node":
             self.mkl_num_threads = mkl_num_threads
@@ -110,11 +112,11 @@ class HPC: # implements IRunner
         return remotepythonpath
 
     def numString(self):
-        if self.min == None and self.max == None:
+        if self.min is None and self.max is None:
             return " -Num{0} *-*".format(self.unit.capitalize())
-        if self.min == None:
+        if self.min is None:
             return " -Num{0} {1}".format(self.unit.capitalize(), self.max)
-        if self.max == None:
+        if self.max is None:
             return " -Num{0} {1}-*".format(self.unit.capitalize(), self.min)
         return " -Num{0} {1}-{2}".format(self.unit.capitalize(), self.min, self.max)
 
@@ -125,6 +127,12 @@ class HPC: # implements IRunner
         stderr_dir_rel = os.path.join(run_dir_rel,"stderr")
         stderr_dir_abs = os.path.join(run_dir_abs,"stderr")
         util.create_directory_if_necessary(stderr_dir_abs, isfile=False)
+        
+        if len(self.excluded_nodes) > 0:
+            excluded_nodes = "Set-HpcJob -Id $r.Id -addExcludedNodes {0}".format(", ".join(self.excluded_nodes))
+        else:
+            excluded_nodes = ""
+
 
         #create the Powershell file
         psfilename_rel = os.path.join(run_dir_rel,"dist.ps1")
@@ -133,10 +141,11 @@ class HPC: # implements IRunner
         with open(psfilename_abs, "w") as psfile:
             psfile.write(r"""Add-PsSnapin Microsoft.HPC
         Set-Content Env:CCP_SCHEDULER {0}
-        $r = New-HpcJob -Name "{7}" -Priority {8}{12}
+        $r = New-HpcJob -Name "{7}" -Priority {8}{12}{14}
         $r.Id
         Add-HpcTask -Name Parametric -JobId $r.Id -Parametric -Start 0 -End {1} -CommandLine "{6} * {5}" -StdOut "{2}\*.txt" -StdErr "{3}\*.txt" -WorkDir {4}
         Add-HpcTask -Name Reduce -JobId $r.Id -Depend Parametric -CommandLine "{6} {5} {5}" -StdOut "{2}\reduce.txt" -StdErr "{3}\reduce.txt" -WorkDir {4}
+        {13}
         Submit-HpcJob -Id $r.Id
         $j = Get-HpcJob -Id $r.Id
         $i = $r.id
@@ -171,7 +180,9 @@ class HPC: # implements IRunner
                                 self.unit,          #9 -- not used anymore,. Instead #12 sets unit
                                 "{",                #10
                                 "}",                #11
-                                self.numString()    #12
+                                self.numString(),   #12
+                                excluded_nodes,     #13
+                                ' -templateName "{0}"'.format(self.template) if self.template is not None else "" #14
                                 ))
 
         import subprocess
@@ -201,7 +212,7 @@ class HPC: # implements IRunner
     @staticmethod
     def FindDirectoriesToExclude(localpythonpathdir):
         logging.info("Looking in '{0}' for directories to skip".format(localpythonpathdir))
-        xd_string = " /XD $TF"
+        xd_string = " /XD $TF /XD .git"
         for root, dir, files in os.walk(localpythonpathdir):
             for file in files:
              if file.lower() == ".ignoretgzchange":
@@ -269,7 +280,7 @@ class HPC: # implements IRunner
         return batfilename_rel
 
     def check_remote_pythoninstall(self):
-        remotepythoninstall = self.fileshare + os.path.sep + "pythonInstallA"
+        remotepythoninstall = self.fileshare + os.path.sep + "pythonInstallB"
         if not os.path.isdir(remotepythoninstall): raise Exception("Expect Python and related directories at '{0}'".format(remotepythoninstall))
 
         return remotepythoninstall

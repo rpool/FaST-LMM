@@ -49,7 +49,77 @@ This release contains the improvements described in Widmer <em>et al.</em>, <em>
 <p>See the FaST-LMM website for related software:
 <a class="reference external" href="http://research.microsoft.com/en-us/um/redmond/projects/MicrosoftGenomics/Fastlmm/">http://research.microsoft.com/en-us/um/redmond/projects/MicrosoftGenomics/Fastlmm/</a></p>
 <p>Our main documentation (including live examples) is also available as ipython notebook:
-<a class="reference external" href="http://nbviewer.ipython.org/github/MicrosoftGenomics/FaST-LMM/blob/master/doc/ipynb/FaST-LMM.ipynb">http://nbviewer.ipython.org/github/MicrosoftGenomics/FaST-LMM/blob/master/doc/ipynb/FaST-LMM.ipynb</a></p>
+<a class="reference external" href="https://github.com/MicrosoftGenomics/FaST-LMM/blob/master/doc/ipynb/FaST-LMM.ipynb">https://github.com/MicrosoftGenomics/FaST-LMM/blob/master/doc/ipynb/FaST-LMM.ipynb</a></p>
+<div class="section" id="epistasis">
+<h2><code class="xref py py-mod docutils literal"><span class="pre">epistasis</span></code><a class="headerlink" href="#epistasis" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="fastlmm.association.epistasis">
+<code class="descclassname">fastlmm.association.</code><code class="descname">epistasis</code><span class="sig-paren">(</span><em>test_snps</em>, <em>pheno</em>, <em>G0</em>, <em>G1=None</em>, <em>mixing=0.0</em>, <em>covar=None</em>, <em>output_file_name=None</em>, <em>sid_list_0=None</em>, <em>sid_list_1=None</em>, <em>log_delta=None</em>, <em>min_log_delta=-5</em>, <em>max_log_delta=10</em>, <em>cache_file=None</em>, <em>runner=None</em><span class="sig-paren">)</span><a class="headerlink" href="#fastlmm.association.epistasis" title="Permalink to this definition">¶</a></dt>
+<dd><p>Function performing epistasis GWAS with ML (never REML).  See <a class="reference external" href="http://www.nature.com/srep/2013/130122/srep01099/full/srep01099.html">http://www.nature.com/srep/2013/130122/srep01099/full/srep01099.html</a>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>test_snps</strong> (a <code class="xref py py-class docutils literal"><span class="pre">SnpReader</span></code> or a string) &#8211; SNPs from which to test pairs. If you give a string, it should be the base name of a set of PLINK Bed-formatted files.</li>
+<li><strong>pheno</strong> (<em>a &#8216;pheno dictionary&#8217; or a string</em>) &#8211; A single phenotype: A &#8216;pheno dictionary&#8217; contains an ndarray on the &#8216;vals&#8217; key and a iid list on the &#8216;iid&#8217; key.
+If you give a string, it should be the file name of a PLINK phenotype-formatted file.</li>
+<li><strong>G0</strong> (a <code class="xref py py-class docutils literal"><span class="pre">SnpReader</span></code> or a string) &#8211; SNPs from which to construct a similarity matrix.
+If you give a string, it should be the base name of a set of PLINK Bed-formatted files.</li>
+<li><strong>G1</strong> (a <code class="xref py py-class docutils literal"><span class="pre">SnpReader</span></code> or a string) &#8211; SNPs from which to construct a second similarity kernel, optional. Also, see &#8216;mixing&#8217;).
+If you give a string, it should be the base name of a set of PLINK Bed-formatted files.</li>
+<li><strong>mixing</strong> (<em>number</em>) &#8211; Weight between 0.0 (inclusive, default) and 1.1 (inclusive) given to G1 relative to G0.
+If you give no mixing number, G0 will get all the weight and G1 will be ignored.</li>
+<li><strong>covar</strong> (<em>a &#8216;pheno dictionary&#8217; or a string</em>) &#8211; covariate information, optional: A &#8216;pheno dictionary&#8217; contains an ndarray on the &#8216;vals&#8217; key and a iid list on the &#8216;iid&#8217; key.
+If you give a string, it should be the file name of a PLINK phenotype-formatted file.</li>
+<li><strong>sid_list_0</strong> (<em>list of strings</em>) &#8211; list of sids, optional:
+All unique pairs from sid_list_0 x sid_list_1 will be evaluated.
+If you give no sid_list_0, all sids in test_snps will be used.</li>
+<li><strong>sid_list_1</strong> (<em>list of strings</em>) &#8211; list of sids, optional:
+All unique pairs from sid_list_0 x sid_list_1 will be evaluated.
+If you give no sid_list_1, all sids in test_snps will be used.</li>
+<li><strong>output_file_name</strong> (<em>file name</em>) &#8211; Name of file to write results to, optional. If not given, no output file will be created.</li>
+<li><strong>log_delta</strong> (<em>number</em>) &#8211; A parameter to LMM learning, optional
+If not given will search for best value.</li>
+<li><strong>min_log_delta</strong> (<em>number</em>) &#8211; (default:-5)
+When searching for log_delta, the lower bounds of the search.</li>
+<li><strong>max_log_delta</strong> (<em>number</em>) &#8211; (default:-5)
+When searching for log_delta, the upper bounds of the search.</li>
+<li><strong>cache_file</strong> (<em>file name</em>) &#8211; Name of  file to read or write cached precomputation values to, optional.
+If not given, no cache file will be used.
+If given and file does not exists, will write precomputation values to file.
+If given and file does exists, will read precomputation values from file.
+The file contains the U and S matrix from the decomposition of the training matrix. It is in Python&#8217;s np.savez (<a href="#id1"><span class="problematic" id="id2">*</span></a>.npz) format.
+Calls using the same cache file should have the same &#8216;G0&#8217; and &#8216;G1&#8217;</li>
+<li><strong>runner</strong> (<em>a runner.</em>) &#8211; a runner, optional: Tells how to run locally, multi-processor, or on a cluster.
+If not given, the function is run locally.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body"><p class="first">Pandas dataframe with one row per SNP pair. Columns include &#8220;PValue&#8221;</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Example:</th><td class="field-body"></td>
+</tr>
+</tbody>
+</table>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">logging</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">pysnptools.snpreader</span> <span class="kn">import</span> <span class="n">Bed</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">fastlmm.association</span> <span class="kn">import</span> <span class="n">epistasis</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">test_snps</span> <span class="o">=</span> <span class="n">Bed</span><span class="p">(</span><span class="s">&#39;../../tests/datasets/all_chr.maf0.001.N300&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">pheno</span> <span class="o">=</span> <span class="s">&#39;../../tests/datasets/phenSynthFrom22.23.N300.randcidorder.txt&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">covar</span> <span class="o">=</span> <span class="s">&#39;../../tests/datasets/all_chr.maf0.001.covariates.N300.txt&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">results_dataframe</span> <span class="o">=</span> <span class="n">epistasis</span><span class="p">(</span><span class="n">test_snps</span><span class="p">,</span> <span class="n">pheno</span><span class="p">,</span> <span class="n">G0</span><span class="o">=</span><span class="n">test_snps</span><span class="p">,</span> <span class="n">covar</span><span class="o">=</span><span class="n">covar</span><span class="p">,</span> 
+<span class="gp">... </span>                                <span class="n">sid_list_0</span><span class="o">=</span><span class="n">test_snps</span><span class="o">.</span><span class="n">sid</span><span class="p">[:</span><span class="mi">10</span><span class="p">],</span> <span class="c">#first 10 snps</span>
+<span class="gp">... </span>                                <span class="n">sid_list_1</span><span class="o">=</span><span class="n">test_snps</span><span class="o">.</span><span class="n">sid</span><span class="p">[</span><span class="mi">5</span><span class="p">:</span><span class="mi">15</span><span class="p">])</span> <span class="c">#Skip 5 snps, use next 10</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">results_dataframe</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">SNP0</span><span class="p">,</span> <span class="n">results_dataframe</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">SNP1</span><span class="p">,</span><span class="nb">round</span><span class="p">(</span><span class="n">results_dataframe</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">PValue</span><span class="p">,</span><span class="mi">5</span><span class="p">),</span><span class="nb">len</span><span class="p">(</span><span class="n">results_dataframe</span><span class="p">)</span>
+<span class="go">1_12 1_9 0.07779 85</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</div>
 <div class="section" id="single-snp">
 <h2><code class="xref py py-mod docutils literal"><span class="pre">single_snp</span></code><a class="headerlink" href="#single-snp" title="Permalink to this headline">¶</a></h2>
 <dl class="function">
@@ -81,7 +151,7 @@ If mixing is unspecified, then h2 must also be unspecified.</li>
 If not given, no cache file will be used.
 If given and file does not exists, will write precomputation values to file.
 If given and file does exists, will read precomputation values from file.
-The file contains the U and S matrix from the decomposition of the training matrix. It is in Python&#8217;s np.savez (<a href="#id1"><span class="problematic" id="id2">*</span></a>.npz) format.
+The file contains the U and S matrix from the decomposition of the training matrix. It is in Python&#8217;s np.savez (<a href="#id3"><span class="problematic" id="id4">*</span></a>.npz) format.
 Calls using the same cache file should have the same &#8216;G0&#8217; and &#8216;G1&#8217;
 If given and the file does exist then G0 and G1 need not be given.</li>
 </ul>
@@ -124,7 +194,7 @@ If given and the file does exist then G0 and G1 need not be given.</li>
 If you give a string, it should be the base name of a set of PLINK Bed-formatted files.</li>
 <li><strong>pheno</strong> (<em>a &#8216;pheno dictionary&#8217; or a string</em>) &#8211; A single phenotype: A &#8216;pheno dictionary&#8217; contains an ndarray on the &#8216;vals&#8217; key and a iid list on the &#8216;iid&#8217; key.
 If you give a string, it should be the file name of a PLINK phenotype-formatted file.</li>
-<li><strong>G1</strong> (a <code class="xref py py-class docutils literal"><span class="pre">SnpReader</span></code> or a string) &#8211; SNPs from which to construct a second simalirty matrix, optional. Also, see &#8216;mixing&#8217;).
+<li><strong>G1</strong> (a <code class="xref py py-class docutils literal"><span class="pre">SnpReader</span></code> or a string) &#8211; SNPs from which to construct a second similarity matrix, optional. Also, see &#8216;mixing&#8217;).
 If you give a string, it should be the base name of a set of PLINK Bed-formatted files.</li>
 <li><strong>mixing</strong> (<em>number</em>) &#8211; Weight between 0.0 (inclusive, default) and 1.0 (inclusive) given to G1 relative to G0.
 If you give no mixing number, G0 will get all the weight and G1 will be ignored.</li>
@@ -159,76 +229,6 @@ default: None</li>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">results_dataframe</span> <span class="o">=</span> <span class="n">single_snp_leave_out_one_chrom</span><span class="p">(</span><span class="n">test_snps</span><span class="o">=</span><span class="s">&quot;../feature_selection/examples/toydata.5chrom&quot;</span><span class="p">,</span> <span class="n">pheno</span><span class="o">=</span><span class="n">pheno_fn</span><span class="p">,</span> <span class="n">h2</span><span class="o">=.</span><span class="mi">2</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">results_dataframe</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">SNP</span><span class="p">,</span><span class="nb">round</span><span class="p">(</span><span class="n">results_dataframe</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">PValue</span><span class="p">,</span><span class="mi">7</span><span class="p">),</span><span class="nb">len</span><span class="p">(</span><span class="n">results_dataframe</span><span class="p">)</span>
 <span class="go">null_576 1e-07 10000</span>
-</pre></div>
-</div>
-</dd></dl>
-
-</div>
-<div class="section" id="epistasis">
-<h2><code class="xref py py-mod docutils literal"><span class="pre">epistasis</span></code><a class="headerlink" href="#epistasis" title="Permalink to this headline">¶</a></h2>
-<dl class="function">
-<dt id="fastlmm.association.epistasis">
-<code class="descclassname">fastlmm.association.</code><code class="descname">epistasis</code><span class="sig-paren">(</span><em>test_snps</em>, <em>pheno</em>, <em>G0</em>, <em>G1=None</em>, <em>mixing=0.0</em>, <em>covar=None</em>, <em>output_file_name=None</em>, <em>sid_list_0=None</em>, <em>sid_list_1=None</em>, <em>log_delta=None</em>, <em>min_log_delta=-5</em>, <em>max_log_delta=10</em>, <em>cache_file=None</em>, <em>runner=None</em><span class="sig-paren">)</span><a class="headerlink" href="#fastlmm.association.epistasis" title="Permalink to this definition">¶</a></dt>
-<dd><p>Function performing epistasis GWAS with ML (never REML).  See <a class="reference external" href="http://www.nature.com/srep/2013/130122/srep01099/full/srep01099.html">http://www.nature.com/srep/2013/130122/srep01099/full/srep01099.html</a>.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>test_snps</strong> (a <code class="xref py py-class docutils literal"><span class="pre">SnpReader</span></code> or a string) &#8211; SNPs from which to test pairs. If you give a string, it should be the base name of a set of PLINK Bed-formatted files.</li>
-<li><strong>pheno</strong> (<em>a &#8216;pheno dictionary&#8217; or a string</em>) &#8211; A single phenotype: A &#8216;pheno dictionary&#8217; contains an ndarray on the &#8216;vals&#8217; key and a iid list on the &#8216;iid&#8217; key.
-If you give a string, it should be the file name of a PLINK phenotype-formatted file.</li>
-<li><strong>G0</strong> (a <code class="xref py py-class docutils literal"><span class="pre">SnpReader</span></code> or a string) &#8211; SNPs from which to construct a similarity matrix.
-If you give a string, it should be the base name of a set of PLINK Bed-formatted files.</li>
-<li><strong>G1</strong> (a <code class="xref py py-class docutils literal"><span class="pre">SnpReader</span></code> or a string) &#8211; SNPs from which to construct a second similarity kernel, optional. Also, see &#8216;mixing&#8217;).
-If you give a string, it should be the base name of a set of PLINK Bed-formatted files.</li>
-<li><strong>mixing</strong> (<em>number</em>) &#8211; Weight between 0.0 (inclusive, default) and 1.1 (inclusive) given to G1 relative to G0.
-If you give no mixing number, G0 will get all the weight and G1 will be ignored.</li>
-<li><strong>covar</strong> (<em>a &#8216;pheno dictionary&#8217; or a string</em>) &#8211; covariate information, optional: A &#8216;pheno dictionary&#8217; contains an ndarray on the &#8216;vals&#8217; key and a iid list on the &#8216;iid&#8217; key.
-If you give a string, it should be the file name of a PLINK phenotype-formatted file.</li>
-<li><strong>sid_list_0</strong> (<em>list of strings</em>) &#8211; list of sids, optional:
-All unique pairs from sid_list_0 x sid_list_1 will be evaluated.
-If you give no sid_list_0, all sids in test_snps will be used.</li>
-<li><strong>sid_list_1</strong> (<em>list of strings</em>) &#8211; list of sids, optional:
-All unique pairs from sid_list_0 x sid_list_1 will be evaluated.
-If you give no sid_list_1, all sids in test_snps will be used.</li>
-<li><strong>output_file_name</strong> (<em>file name</em>) &#8211; Name of file to write results to, optional. If not given, no output file will be created.</li>
-<li><strong>log_delta</strong> (<em>number</em>) &#8211; A parameter to LMM learning, optional
-If not given will search for best value.</li>
-<li><strong>min_log_delta</strong> (<em>number</em>) &#8211; (default:-5)
-When searching for log_delta, the lower bounds of the search.</li>
-<li><strong>max_log_delta</strong> (<em>number</em>) &#8211; (default:-5)
-When searching for log_delta, the upper bounds of the search.</li>
-<li><strong>cache_file</strong> (<em>file name</em>) &#8211; Name of  file to read or write cached precomputation values to, optional.
-If not given, no cache file will be used.
-If given and file does not exists, will write precomputation values to file.
-If given and file does exists, will read precomputation values from file.
-The file contains the U and S matrix from the decomposition of the training matrix. It is in Python&#8217;s np.savez (<a href="#id3"><span class="problematic" id="id4">*</span></a>.npz) format.
-Calls using the same cache file should have the same &#8216;G0&#8217; and &#8216;G1&#8217;</li>
-<li><strong>runner</strong> (<em>a runner.</em>) &#8211; a runner, optional: Tells how to run locally, multi-processor, or on a cluster.
-If not given, the function is run locally.</li>
-</ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body"><p class="first">Pandas dataframe with one row per SNP pair. Columns include &#8220;PValue&#8221;</p>
-</td>
-</tr>
-<tr class="field-odd field"><th class="field-name">Example:</th><td class="field-body"></td>
-</tr>
-</tbody>
-</table>
-<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">logging</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">pysnptools.snpreader</span> <span class="kn">import</span> <span class="n">Bed</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">fastlmm.association</span> <span class="kn">import</span> <span class="n">epistasis</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">test_snps</span> <span class="o">=</span> <span class="n">Bed</span><span class="p">(</span><span class="s">&#39;../../tests/datasets/all_chr.maf0.001.N300&#39;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">pheno</span> <span class="o">=</span> <span class="s">&#39;../../tests/datasets/phenSynthFrom22.23.N300.randcidorder.txt&#39;</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">covar</span> <span class="o">=</span> <span class="s">&#39;../../tests/datasets/all_chr.maf0.001.covariates.N300.txt&#39;</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">results_dataframe</span> <span class="o">=</span> <span class="n">epistasis</span><span class="p">(</span><span class="n">test_snps</span><span class="p">,</span> <span class="n">pheno</span><span class="p">,</span> <span class="n">G0</span><span class="o">=</span><span class="n">test_snps</span><span class="p">,</span> <span class="n">covar</span><span class="o">=</span><span class="n">covar</span><span class="p">,</span> 
-<span class="gp">... </span>                                <span class="n">sid_list_0</span><span class="o">=</span><span class="n">test_snps</span><span class="o">.</span><span class="n">sid</span><span class="p">[:</span><span class="mi">10</span><span class="p">],</span> <span class="c">#first 10 snps</span>
-<span class="gp">... </span>                                <span class="n">sid_list_1</span><span class="o">=</span><span class="n">test_snps</span><span class="o">.</span><span class="n">sid</span><span class="p">[</span><span class="mi">5</span><span class="p">:</span><span class="mi">15</span><span class="p">])</span> <span class="c">#Skip 5 snps, use next 10</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">results_dataframe</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">SNP0</span><span class="p">,</span> <span class="n">results_dataframe</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">SNP1</span><span class="p">,</span><span class="nb">round</span><span class="p">(</span><span class="n">results_dataframe</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">PValue</span><span class="p">,</span><span class="mi">5</span><span class="p">),</span><span class="nb">len</span><span class="p">(</span><span class="n">results_dataframe</span><span class="p">)</span>
-<span class="go">1_12 1_9 0.07779 85</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -286,6 +286,51 @@ If not given, the function is run locally.</li>
 <span class="go">set23 0.0</span>
 </pre></div>
 </div>
+</dd></dl>
+
+</div>
+<div class="section" id="heritability-spatial-correction">
+<h2><code class="xref py py-mod docutils literal"><span class="pre">heritability_spatial_correction</span></code><a class="headerlink" href="#heritability-spatial-correction" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="fastlmm.association.heritability_spatial_correction">
+<code class="descclassname">fastlmm.association.</code><code class="descname">heritability_spatial_correction</code><span class="sig-paren">(</span><em>G_kernel</em>, <em>spatial_coor</em>, <em>spatial_iid</em>, <em>alpha_list</em>, <em>pheno</em>, <em>map_function=&lt;built-in function map&gt;</em>, <em>cache_folder=None</em>, <em>jackknife_count=500</em>, <em>permute_plus_count=10000</em>, <em>permute_times_count=10000</em>, <em>seed=0</em>, <em>just_testing=False</em><span class="sig-paren">)</span><a class="headerlink" href="#fastlmm.association.heritability_spatial_correction" title="Permalink to this definition">¶</a></dt>
+<dd><p>Function measuring heritability with correction for spatial location.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>G_kernel</strong> (a <code class="xref py py-class docutils literal"><span class="pre">KernelReader</span></code>, <code class="xref py py-class docutils literal"><span class="pre">SnpReader</span></code> or a string) &#8211; A kernel that tells the genetic similarity between all pairs of individuals. The kernel can be given 
+explicitly, for example with a <code class="xref py py-class docutils literal"><span class="pre">KernelData</span></code>. The kernel can also be given implicitly by providing a set of
+SNPs or the name of a BED file.</li>
+<li><strong>spatial_coor</strong> (<em>a iid_count x 2 array</em>) &#8211; The position of each individual given by two coordinates. Any units are allowed, but the two values
+must be compatible so that distance can be determined via Pythagoras&#8217; theorem. (So, longitude and latitude should
+not be used unless the locations are near the Equator.)</li>
+<li><strong>spatial_iid</strong> (<em>array of strings with shape [iid_count,2]</em>) &#8211; A ndarray of the iids. Each iid is a ndarray of two strings (a family ID and a case ID) that identifies an individual.</li>
+<li><strong>alpha_list</strong> (<em>list of numbers</em>) &#8211; a list of numbers to search to find the best alpha, which is the similarity scale. The similarity of two individuals
+is here defined as exp(-distance_between/alpha). If the closest individuals are 100 units apart and the farthest
+individuals are 4e6 units apart, a reasonable alpha_list might be: [int(v) for v in np.logspace(np.log10(100),np.log10(1e10), 100)]
+The function&#8217;s reports on the alphas chosen. If an extreme alpha is picked, change alpha_list to cover more range.</li>
+<li><strong>pheno</strong> (a <code class="xref py py-class docutils literal"><span class="pre">SnpReader</span></code> or string) &#8211; The target values(s) to predict. It can be a file name readable via <code class="xref py py-class docutils literal"><span class="pre">SnpReader.Pheno</span></code> or any <code class="xref py py-class docutils literal"><span class="pre">SnpReader</span></code>.</li>
+<li><strong>cache_folder</strong> (<em>a string</em>) &#8211; (default &#8216;None&#8217;) The name of a directory in which to save intermediate results. If &#8216;None&#8217;, then no intermediate results are saved.</li>
+<li><strong>map_function</strong> (<em>a function</em>) &#8211; (default &#8216;map&#8217;) A function with the same inputs and functionality as Python&#8217;s &#8216;map&#8217; function.
+Can be used to run &#8216;heritability_spatial_correction&#8217; on a cluster.</li>
+<li><strong>jackknife_count</strong> (<em>number</em>) &#8211; (default 500) The number of jackknife groups to use when calculating standard errors (SE). Changing to a small number, 2, 
+speeds up calculation at the cost of unusable SEs.</li>
+<li><strong>permute_plus_count</strong> (<em>number</em>) &#8211; (default 10000) The number of permutations used when calculating P values. Changing to a small number, 1, 
+speeds up calculation at the cost of unusable P values.</li>
+<li><strong>permute_times_count</strong> (<em>number</em>) &#8211; (default 10000) The number of permutations used when calculating P values. Changing to a small number, 1, 
+speeds up calculation at the cost of unusable P values.</li>
+<li><strong>seed</strong> (<em>number</em>) &#8211; (default 0) The random seed used by jackknifing and permutation.</li>
+<li><strong>just_testing</strong> (<em>bool</em>) &#8211; (default False) If true, skips actual LMM-related search and calculation.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">Pandas dataframe with one row per phenotyper. Columns include &#8220;h2uncorr&#8221;, &#8220;h2corr&#8221;, etc.</p>
+</td>
+</tr>
+</tbody>
+</table>
 </dd></dl>
 
 </div>
@@ -348,10 +393,11 @@ Relatedness is measured with a RRM (realized relationship matrix) so 0 is no rel
   <h3><a href="#">Table Of Contents</a></h3>
   <ul>
 <li><a class="reference internal" href="#"><code class="docutils literal"><span class="pre">fastlmm</span></code> API Documentation</a><ul>
+<li><a class="reference internal" href="#epistasis"><code class="docutils literal"><span class="pre">epistasis</span></code></a></li>
 <li><a class="reference internal" href="#single-snp"><code class="docutils literal"><span class="pre">single_snp</span></code></a></li>
 <li><a class="reference internal" href="#single-snp-leave-out-one-chrom"><code class="docutils literal"><span class="pre">single_snp_leave_out_one_chrom</span></code></a></li>
-<li><a class="reference internal" href="#epistasis"><code class="docutils literal"><span class="pre">epistasis</span></code></a></li>
 <li><a class="reference internal" href="#snp-set"><code class="docutils literal"><span class="pre">snp_set</span></code></a></li>
+<li><a class="reference internal" href="#heritability-spatial-correction"><code class="docutils literal"><span class="pre">heritability_spatial_correction</span></code></a></li>
 <li><a class="reference internal" href="#compute-auto-pcs"><code class="docutils literal"><span class="pre">compute_auto_pcs</span></code></a></li>
 <li><a class="reference internal" href="#indices-and-tables">Indices and Tables</a></li>
 </ul>
