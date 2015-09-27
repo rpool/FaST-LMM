@@ -125,7 +125,7 @@ class TestSnpSet(unittest.TestCase):
         outfile = os.path.splitext(_infile)[0]
 
         windows_fn = self.currentFolder+'/../../../tests/expected-Windows/'+outfile+'.txt'
-        assert os.path.exists(windows_fn)
+        assert os.path.exists(windows_fn), "Can't find file '{0}'".format(windows_fn)
         debian_fn = self.currentFolder+'/../../../tests/expected-debian/'+outfile  +'.txt'
         if not os.path.exists(debian_fn): #If reference file is not in debian folder, look in windows folder
             debian_fn = windows_fn

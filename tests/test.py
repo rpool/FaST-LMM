@@ -55,7 +55,7 @@ class WidgetTestCase(unittest.TestCase):
         outfile = os.path.splitext(self._infile)[0]
 
         windows_fn = 'expected-Windows/'+outfile+'.txt'
-        assert os.path.exists(windows_fn)
+        assert os.path.exists(windows_fn), "Can't find file '{0}'".format(windows_fn)
         debian_fn = 'expected-debian/'+outfile  +'.txt'
         if not os.path.exists(debian_fn): #If reference file is not in debian folder, look in windows folder
             debian_fn = windows_fn
@@ -135,6 +135,7 @@ if __name__ == '__main__':
     import fastlmm.association.tests.test_single_snp
     import fastlmm.association.tests.test_snp_set
     import fastlmm.association.tests.test_gwas
+    import fastlmm.association.tests.test_heritability_spatial_correction
     import fastlmm.util.testdistributable
     import fastlmm.util.test
 
@@ -147,6 +148,7 @@ if __name__ == '__main__':
                                     fastlmm.association.tests.test_single_snp.getTestSuite(),
                                     fastlmm.association.tests.testepistasis.getTestSuite(),
                                     fastlmm.association.tests.test_snp_set.getTestSuite(),
+                                    fastlmm.association.tests.test_gwas.getTestSuite(),
                                     fastlmm.association.tests.test_gwas.getTestSuite(),
                                     fastlmm.util.testdistributable.getTestSuite(),
                                     fastlmm.feature_selection.test.getTestSuite(),

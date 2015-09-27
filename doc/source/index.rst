@@ -10,8 +10,13 @@ See the FaST-LMM website for related software:
 http://research.microsoft.com/en-us/um/redmond/projects/MicrosoftGenomics/Fastlmm/
 
 Our main documentation (including live examples) is also available as ipython notebook:
-http://nbviewer.ipython.org/github/MicrosoftGenomics/FaST-LMM/blob/master/doc/ipynb/FaST-LMM.ipynb
+https://github.com/MicrosoftGenomics/FaST-LMM/blob/master/doc/ipynb/FaST-LMM.ipynb
 
+
+**************************************************
+:mod:`epistasis`
+**************************************************
+.. autofunction:: fastlmm.association.epistasis
 
 **************************************************
 :mod:`single_snp`
@@ -26,23 +31,21 @@ http://nbviewer.ipython.org/github/MicrosoftGenomics/FaST-LMM/blob/master/doc/ip
 .. autofunction:: fastlmm.association.single_snp_leave_out_one_chrom
 
 **************************************************
-:mod:`epistasis`
-**************************************************
-.. autofunction:: fastlmm.association.epistasis
-
-
-**************************************************
 :mod:`snp_set`
 **************************************************
 .. autofunction:: fastlmm.association.snp_set
 
+
+**************************************************
+:mod:`heritability_spatial_correction`
+**************************************************
+.. autofunction:: fastlmm.association.heritability_spatial_correction
 
 
 **************************************************
 :mod:`compute_auto_pcs`
 **************************************************
 .. autofunction:: fastlmm.util.compute_auto_pcs
-
  
 .. only:: html 
 
