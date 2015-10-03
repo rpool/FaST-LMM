@@ -32,7 +32,7 @@ def _write_csv(dataframe, index, filename):
     logging.info(filename)
     logging.info(dataframe)
 
-def spatial_similarity(spatial_coor, alpha):     # scale spatial coordinates
+def spatial_similarity(spatial_coor, alpha, power):     # scale spatial coordinates
     """
     :param spatial_coor: The position of each individual given by two coordinates. Any units are allowed, but the two values
        must be compatible so that distance can be determined via Pythagoras' theorem. (So, longitude and latitude should
@@ -44,7 +44,9 @@ def spatial_similarity(spatial_coor, alpha):     # scale spatial coordinates
 
     :rtype: square numpy array of similarities.
     """
-    return np.exp(-sklearn.metrics.pairwise_distances(spatial_coor) / float(alpha))
+    return np.exp(-
+                  (sklearn.metrics.pairwise_distances(spatial_coor) /alpha)**power
+                  )
 
 def work_item(arg_tuple):               
     (pheno, G_kernel, spatial_coor, spatial_iid, alpha,                          # The main inputs
@@ -62,7 +64,7 @@ def work_item(arg_tuple):
     #########################################
     # Environment: Turn spatial info info a KernelData
     #########################################
-    spatial_val = spatial_similarity(spatial_coor, alpha)
+    spatial_val = spatial_similarity(spatial_coor, alpha, power=1)
     E_kernel = KernelData(iid=spatial_iid,val=spatial_val)
 
     #########################################
@@ -188,7 +190,7 @@ def work_item(arg_tuple):
 def heritability_spatial_correction(G_kernel, spatial_coor, spatial_iid, alpha_list, pheno, 
                      map_function = map, cache_folder=None, 
                      jackknife_count=500, permute_plus_count=10000, permute_times_count=10000, seed=0,
-                     just_testing=False,  always_remote=False
+                     just_testing=False,  always_remote=False, allow_gxe2 = True
                      ):
     """
     Function measuring heritability with correction for spatial location.
@@ -276,8 +278,8 @@ def heritability_spatial_correction(G_kernel, spatial_coor, spatial_iid, alpha_l
             for alpha in alpha_list:
                             #pheno, G_kernel, spatial_coor, spatial_iid, alpha, (jackknife_index, jackknife_count, jackknife_seed),
                 arg_tuple = (pheno_one, G_kernel, spatial_coor, spatial_iid, alpha, (-1,     0,     None),  
-                             # (permute_plus_index, permute_plus_count, permute_plus_seed), (permute_times_index, permute_times_count, permute_times_seed) ,just_testing, do_uncorr, do_gxe2, a2
-                               (-1,     0,     None),                                       (-1,     0,     None),                                          just_testing, False,     True,   None)
+                             # (permute_plus_index, permute_plus_count, permute_plus_seed), (permute_times_index, permute_times_count, permute_times_seed) ,just_testing, do_uncorr, do_gxe2,               a2
+                               (-1,     0,     None),                                       (-1,     0,     None),                                          just_testing, False,     True and allow_gxe2,   None)
                 arg_list.append(arg_tuple)
 
         # Run "run_line" on each set of arguments and save to file
@@ -292,7 +294,7 @@ def heritability_spatial_correction(G_kernel, spatial_coor, spatial_iid, alpha_l
     alpha_dict = {}
     for phen, phen_table in grouped:
         best_index_corr = phen_table['nLLcorr'].idxmin() # with Pandas, this returns the index in the parent table, not the group table
-        best_index_gxe2 = phen_table['nLL_gxe2'].idxmin()
+        best_index_gxe2 = phen_table['nLL_gxe2'].idxmin() if allow_gxe2 else 0
         alpha_corr = alpha_table.iloc[best_index_corr]['alpha']
         alpha_gxe2 = alpha_table.iloc[best_index_gxe2]['alpha']
         alpha_dict[phen] = alpha_corr, alpha_gxe2
@@ -318,7 +320,7 @@ def heritability_spatial_correction(G_kernel, spatial_coor, spatial_iid, alpha_l
             for alpha in alpha_set:
                 logging.debug(alpha)
                 do_uncorr = (alpha == alpha_corr)
-                do_gxe2   = (alpha == alpha_gxe2)
+                do_gxe2   = (alpha == alpha_gxe2) and allow_gxe2
                 for jackknife in range(-1, jackknife_count_actual):
                                # pheno, G_kernel, spatial_coor, spatial_iid, alpha, (jackknife_index, jackknife_count,         jackknife_seed),
                     arg_tuple = (pheno_one, G_kernel, spatial_coor, spatial_iid, alpha, (jackknife,       jackknife_count_actual,  jackknife_seed),
@@ -440,7 +442,7 @@ def heritability_spatial_correction(G_kernel, spatial_coor, spatial_iid, alpha_l
                            # pheno, G_kernel, spatial_coor, spatial_iid, alpha,      (permute_index, permute_count, permute_seed),
                 arg_tuple = (pheno_one, G_kernel, spatial_coor, spatial_iid, alpha_gxe2, (-1,0,None),
                              # (permute_plus_index, permute_plus_count, permute_plus_seed), (permute_times_index, permute_times_count, permute_times_seed) ,just_testing, do_uncorr, do_gxe2, a2
-                            (-1,0,None),                                                    (permute_index, permute_times_count,permute_times_seed),        just_testing, False,     True,    a2)
+                            (-1,0,None),                                                    (permute_index, permute_times_count,permute_times_seed),        just_testing, False,     allow_gxe2,    a2)
                 arg_list.append(arg_tuple)    
 
             # Run "run_line" on each set of arguments and save to file

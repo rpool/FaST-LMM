@@ -71,7 +71,7 @@ class HPC: # implements IRunner
         with open(result_remote, mode='rb') as f:
             result = pickle.load(f)
 
-        logging.info('Done: HPC runner is running a distributable. Returns {0}'.format(result))
+        #logging.info('Done: HPC runner is running a distributable. Returns {0}'.format(result))
         return result
 
 

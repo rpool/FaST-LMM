@@ -79,7 +79,7 @@ class Hadoop2: # implements IRunner
         with open(result_local, mode='rb') as f:
             result = pickle.load(f)
 
-        logging.info('Done: Hadoop2 runner is running a distributable. Returns {0}'.format(result))
+        #logging.info('Done: Hadoop2 runner is running a distributable. Returns {0}'.format(result))
         return result
 
     def submit_to_cluster(self, batfilename_rel_list, fileInWorkingDirectoryList, tgzList, tgzListPythonPath, tgzListPythonSettings, distributable, remotewd, run_dir_abs, run_dir_rel):

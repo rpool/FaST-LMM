@@ -18,7 +18,8 @@ class LMM(object):
     K0 = G0*G0^T
     K1 = G1*G1^T
     """
-    __slots__ = ["G","G0","G1","y","X","K0","K1","K","U","S","UX","Uy","UUX","UW","UUW","UUy","pos0","pos1","a2","exclude_idx","forcefullrank","numcalls","Xstar","Kstar","Kstar_star","UKstar","UUKstar","Gstar"]
+    __slots__ = ["G","G0","G1","y","X","K0","K1","K","U","S","UX","Uy","UUX","UW","UUW","UUy","pos0","pos1","a2","exclude_idx",
+                 "forcefullrank","numcalls","Xstar","Kstar","Kstar_star","UKstar","UUKstar","Gstar","K0star","K1star","K0star_star","K1star_star"]
 
     def __init__(self,forcefullrank=False):
         '''
@@ -71,6 +72,13 @@ class LMM(object):
         if (k<N):
             self.UUX = X - self.U.dot(self.UX)
 
+    def setX2(self, X):
+        '''
+        !!!cmk need comments
+        '''
+        self.X   = X
+        N=self.X.shape[0]
+
     def sety(self, y):
         '''
         set the phenotype y.
@@ -87,6 +95,14 @@ class LMM(object):
         N=self.y.shape[0]
         if (k<N):
             self.UUy = y - self.U.dot(self.Uy)
+
+    def sety2(self, y):
+        '''
+        !!!!cmk need comments
+        '''
+        assert y.ndim==1, "y should be 1-dimensional"
+        self.y   = y
+        N=self.y.shape[0]
 
     def setG(self, G0=None, G1=None, a2=0.0, K0=None,K1=None):
         '''
@@ -198,6 +214,19 @@ class LMM(object):
         self.a2 = a2
 
         
+    def setK2(self, K0, K1=None, a2=0.0):
+        '''
+        !!!cmk need comments
+        '''
+        self.K0 = K0
+        self.K1 = K1
+        logging.debug("About to mix K0 and K1")
+        if K1 is None:
+            self.K = K0
+        else:
+            self.K = (1.0-a2) * K0 + a2 * K1
+        self.a2 = a2
+
     def set_exclude_idx(self, idx):
         '''
         
@@ -287,7 +316,7 @@ class LMM(object):
             res = self.nLLeval(h2=x,**kwargs)
             if (resmin[0] is None) or (res['nLL']<resmin[0]['nLL']):
                 resmin[0]=res
-            #logging.debug("search\t{0}\t{1}".format(x,res['nLL']))
+            #logging.info("search\t{0}\t{1}".format(x,res['nLL']))
             return res['nLL']
         min = minimize1D(f=f, nGrid=nGridH2, minval=minH2, maxval=maxH2 )
         return resmin[0]
@@ -590,7 +619,17 @@ class LMM(object):
                 # see e.g. Equation 3.17 in Supplement of FaST LMM paper
                 self.UUKstar = self.Kstar.T - SP.dot(self.U, self.UKstar)
    
-
+    def setTestData2(self,Xstar,K0star=None,K1star=None):
+        '''
+        need commetns !!!cmk
+        '''
+        
+        self.Xstar = Xstar
+        self.Gstar = None
+        if K1star is None:
+            self.Kstar = K0star
+        else:
+            self.Kstar = (1.0-self.a2)*K0star + self.a2*K1star
    
     def predictMean(self, beta, h2=0.0, logdelta=None, delta=None, scale=1.0):
         '''
@@ -762,7 +801,7 @@ class LMM(object):
         else:
             #Sd = (h2*self.S + (1.0-h2))*sigma2
             Sd = (h2*self.S + (1.0-h2))
-            assert False, "h2 code path not test. Plese use delta or logdelta"
+            assert False, "h2 code path not test. Please use delta or logdelta"
             #delta = 1.0/h2-1.0 #right?
             
         Sdi = 1./Sd
