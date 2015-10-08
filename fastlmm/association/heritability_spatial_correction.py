@@ -49,7 +49,7 @@ def spatial_similarity(spatial_coor, alpha, power):     # scale spatial coordina
                   )
 
 def work_item(arg_tuple):               
-    (pheno, G_kernel, spatial_coor, spatial_iid, alpha,                          # The main inputs
+    (pheno, G_kernel, spatial_coor, spatial_iid, alpha,alpha_power,    # The main inputs
      (jackknife_index, jackknife_count, jackknife_seed),               # Jackknifing and permutations inputs
      (permute_plus_index, permute_plus_count, permute_plus_seed),
      (permute_times_index, permute_times_count, permute_times_seed),
@@ -64,7 +64,7 @@ def work_item(arg_tuple):
     #########################################
     # Environment: Turn spatial info info a KernelData
     #########################################
-    spatial_val = spatial_similarity(spatial_coor, alpha, power=1)
+    spatial_val = spatial_similarity(spatial_coor, alpha, power=alpha_power)
     E_kernel = KernelData(iid=spatial_iid,val=spatial_val)
 
     #########################################
@@ -178,7 +178,7 @@ def work_item(arg_tuple):
     #########################################
 
     ret = {"h2uncorr": h2uncorr, "nLLuncorr": nLLuncorr, "h2corr": h2corr, "e2":e2, "a2": a2, "nLLcorr": nLLcorr,
-           "gxe2": gxe2, "a2_gxe2": a2_gxe2, "nLL_gxe2": nLL_gxe2, "alpha": alpha, "phen": pheno.sid[0],
+           "gxe2": gxe2, "a2_gxe2": a2_gxe2, "nLL_gxe2": nLL_gxe2, "alpha": alpha, "alpha_power":alpha_power, "phen": pheno.sid[0],
            "jackknife_index": jackknife_index, "jackknife_count":jackknife_count, "jackknife_seed":jackknife_seed,
            "permute_plus_index": permute_plus_index, "permute_plus_count":permute_plus_count, "permute_plus_seed":permute_plus_seed,
            "permute_times_index": permute_times_index, "permute_times_count":permute_times_count, "permute_times_seed":permute_times_seed
@@ -187,7 +187,7 @@ def work_item(arg_tuple):
     logging.info("run_line: {0}".format(ret))
     return ret
 
-def heritability_spatial_correction(G_kernel, spatial_coor, spatial_iid, alpha_list, pheno, 
+def heritability_spatial_correction(G_kernel, spatial_coor, spatial_iid, alpha_list, alpha_power, pheno, 
                      map_function = map, cache_folder=None, 
                      jackknife_count=500, permute_plus_count=10000, permute_times_count=10000, seed=0,
                      just_testing=False,  always_remote=False, allow_gxe2 = True
@@ -276,8 +276,8 @@ def heritability_spatial_correction(G_kernel, spatial_coor, spatial_iid, alpha_l
         for phen_target in pheno.sid:
             pheno_one = pheno[:,pheno.col_to_index([phen_target])] # Look at only this pheno_target
             for alpha in alpha_list:
-                            #pheno, G_kernel, spatial_coor, spatial_iid, alpha, (jackknife_index, jackknife_count, jackknife_seed),
-                arg_tuple = (pheno_one, G_kernel, spatial_coor, spatial_iid, alpha, (-1,     0,     None),  
+                            #pheno, G_kernel, spatial_coor, spatial_iid, alpha,     alpha_power,  (jackknife_index, jackknife_count, jackknife_seed),
+                arg_tuple = (pheno_one, G_kernel, spatial_coor, spatial_iid, alpha, alpha_power, (-1,     0,     None),  
                              # (permute_plus_index, permute_plus_count, permute_plus_seed), (permute_times_index, permute_times_count, permute_times_seed) ,just_testing, do_uncorr, do_gxe2,               a2
                                (-1,     0,     None),                                       (-1,     0,     None),                                          just_testing, False,     True and allow_gxe2,   None)
                 arg_list.append(arg_tuple)
@@ -322,8 +322,8 @@ def heritability_spatial_correction(G_kernel, spatial_coor, spatial_iid, alpha_l
                 do_uncorr = (alpha == alpha_corr)
                 do_gxe2   = (alpha == alpha_gxe2) and allow_gxe2
                 for jackknife in range(-1, jackknife_count_actual):
-                               # pheno, G_kernel, spatial_coor, spatial_iid, alpha, (jackknife_index, jackknife_count,         jackknife_seed),
-                    arg_tuple = (pheno_one, G_kernel, spatial_coor, spatial_iid, alpha, (jackknife,       jackknife_count_actual,  jackknife_seed),
+                               # pheno, G_kernel, spatial_coor, spatial_iid, alpha,     alpha_power, (jackknife_index, jackknife_count,         jackknife_seed),
+                    arg_tuple = (pheno_one, G_kernel, spatial_coor, spatial_iid, alpha, alpha_power, (jackknife,       jackknife_count_actual,  jackknife_seed),
                                     # (permute_plus_index, permute_plus_count, permute_plus_seed), (permute_times_index, permute_times_count, permute_times_seed) ,just_testing, do_uncorr, do_gxe2, a2
                                     (-1,0,None),                                                 (-1,0,None),                                                    just_testing, do_uncorr, do_gxe2, None)
                     arg_list.append(arg_tuple)    
@@ -391,8 +391,8 @@ def heritability_spatial_correction(G_kernel, spatial_coor, spatial_iid, alpha_l
             pheno_one = pheno[:,pheno.col_to_index([phen_target])] # Look at only this pheno_target
             alpha_corr, alpha_gxe2 = alpha_dict[phen_target]
             for jackknife_index in range(-1,permute_plus_count):
-                           # pheno, G_kernel, spatial_coor, spatial_iid, alpha,      (jackknife_index, jackknife_count, jackknife_seed),
-                arg_tuple = (pheno_one, G_kernel, spatial_coor, spatial_iid, alpha_corr, (-1,0,None),
+                           # pheno, G_kernel, spatial_coor, spatial_iid, alpha,          alpha_power,    (jackknife_index, jackknife_count, jackknife_seed),
+                arg_tuple = (pheno_one, G_kernel, spatial_coor, spatial_iid, alpha_corr, alpha_power, (-1,0,None),
                              # (permute_plus_index, permute_plus_count, permute_plus_seed), (permute_times_index, permute_times_count, permute_times_seed) ,just_testing, do_uncorr, do_gxe2, a2
                              (jackknife_index, permute_plus_count,permute_plus_seed),       (-1,0,None),                                                    just_testing, False,    False,    None)
                 arg_list.append(arg_tuple)
@@ -439,8 +439,8 @@ def heritability_spatial_correction(G_kernel, spatial_coor, spatial_iid, alpha_l
             alpha_corr, alpha_gxe2 = alpha_dict[phen_target]
             a2 = float(permplus_table[permplus_table.phen==phen_target][permplus_table.permute_plus_index == -1]['a2'])
             for permute_index in range(-1,permute_times_count):
-                           # pheno, G_kernel, spatial_coor, spatial_iid, alpha,      (permute_index, permute_count, permute_seed),
-                arg_tuple = (pheno_one, G_kernel, spatial_coor, spatial_iid, alpha_gxe2, (-1,0,None),
+                           # pheno, G_kernel, spatial_coor, spatial_iid, alpha,          alpha_powerm (permute_index, permute_count, permute_seed),
+                arg_tuple = (pheno_one, G_kernel, spatial_coor, spatial_iid, alpha_gxe2, alpha_power, (-1,0,None),
                              # (permute_plus_index, permute_plus_count, permute_plus_seed), (permute_times_index, permute_times_count, permute_times_seed) ,just_testing, do_uncorr, do_gxe2, a2
                             (-1,0,None),                                                    (permute_index, permute_times_count,permute_times_seed),        just_testing, False,     allow_gxe2,    a2)
                 arg_list.append(arg_tuple)    
@@ -464,7 +464,7 @@ def heritability_spatial_correction(G_kernel, spatial_coor, spatial_iid, alpha_l
         real_result_permtimes.set_index(['phen'],inplace=True)
 
         # Create a table of the permutation runs and add the real nLL to reach row
-        summary_permtimes_table_fn = "summary.permutation.GxE.{0}.count{1}.txt".format(len(permtimes_phenotypes), permute_times_count)
+        summary_permtimes_table_fn = "{0}/summary.permutation.GxE.{1}.count{2}.txt".format(cache_folder,len(permtimes_phenotypes), permute_times_count)
 
         perm_table = permtimes_table[permtimes_table.permute_times_index!=-1]
         resultx = perm_table.join(real_result_permtimes, on='phen')
@@ -484,6 +484,7 @@ def heritability_spatial_correction(G_kernel, spatial_coor, spatial_iid, alpha_l
 
     #Rename some columns and join results
     results_gxe2.rename(columns={"alpha":"alpha_gxe2","gxe2 SE":"SE (gxe2)"}, inplace=True)
+    del results_gxe2['alpha_power']
     results_gxe2.set_index(["phen"],inplace=True)
     final0 = results_corr.join(results_gxe2, on='phen')
 
