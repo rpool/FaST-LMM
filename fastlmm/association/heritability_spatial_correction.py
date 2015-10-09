@@ -39,7 +39,10 @@ def spatial_similarity(spatial_coor, alpha, power):     # scale spatial coordina
        not be used unless the locations are near the Equator.) 
     :type spatial_coor: a iid_count x 2 array
 
-    :param alpha: a similarity scale. The similarity of two individuals is defined as exp(-distance_between/alpha).
+    :param alpha: a similarity scale. The similarity of two individuals is defined as exp(-(distance_between/alpha)**power).
+    :type alpha: number
+
+    :param power: 2 (a good choice) means that similarity goes with area. 1 means with distance.
     :type alpha: number
 
     :rtype: square numpy array of similarities.
@@ -209,10 +212,13 @@ def heritability_spatial_correction(G_kernel, spatial_coor, spatial_iid, alpha_l
     :type spatial_iid: array of strings with shape [iid_count,2]
 
     :param alpha_list: a list of numbers to search to find the best alpha, which is the similarity scale. The similarity of two individuals
-      is here defined as exp(-distance_between/alpha). If the closest individuals are 100 units apart and the farthest
+      is here defined as exp(-(distance_between/alpha)**alpha_power). If the closest individuals are 100 units apart and the farthest
       individuals are 4e6 units apart, a reasonable alpha_list might be: [int(v) for v in np.logspace(np.log10(100),np.log10(1e10), 100)]
       The function's reports on the alphas chosen. If an extreme alpha is picked, change alpha_list to cover more range.
     :type alpha_list: list of numbers
+
+    :param alpha_power: 2 (a good choice) means that similarity goes with area. 1 means with distance.
+    :type alpha_list: number
 
     :param pheno: The target values(s) to predict. It can be a file name readable via :class:`SnpReader.Pheno` or any :class:`.SnpReader`.
     :type pheno: a :class:`.SnpReader` or string
@@ -498,7 +504,7 @@ def heritability_spatial_correction(G_kernel, spatial_coor, spatial_iid, alpha_l
         final2 = final1.join(pivot_table_times, on='phen')
     else:
         final2 = final1.copy()
-        final2["P(gxe2=0)"] = 0
+        final2["P(gxe2=0)"] = np.nan
 
     #Rename 'phen' and select final columns
     final2.rename(columns={"phen":"phenotype"}, inplace=True)

@@ -74,7 +74,7 @@ class LMM(object):
 
     def setX2(self, X):
         '''
-        !!!cmk need comments
+        a version of setX that doesn't assume that Eigenvalue decomposition has been done.
         '''
         self.X   = X
         N=self.X.shape[0]
@@ -98,7 +98,7 @@ class LMM(object):
 
     def sety2(self, y):
         '''
-        !!!!cmk need comments
+        a version of sety that doesn't assume that Eigenvalue decomposition has been done.
         '''
         assert y.ndim==1, "y should be 1-dimensional"
         self.y   = y
@@ -216,7 +216,7 @@ class LMM(object):
         
     def setK2(self, K0, K1=None, a2=0.0):
         '''
-        !!!cmk need comments
+        a version of setK that doesn't do Eigenvalue decomposition.
         '''
         self.K0 = K0
         self.K1 = K1
@@ -621,7 +621,7 @@ class LMM(object):
    
     def setTestData2(self,Xstar,K0star=None,K1star=None):
         '''
-        need commetns !!!cmk
+        a version of setTestData that doesn't assume that Eigenvalue decomposition has been done.
         '''
         
         self.Xstar = Xstar

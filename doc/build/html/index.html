@@ -293,7 +293,7 @@ default: None</li>
 <h2><code class="xref py py-mod docutils literal"><span class="pre">heritability_spatial_correction</span></code><a class="headerlink" href="#heritability-spatial-correction" title="Permalink to this headline">¶</a></h2>
 <dl class="function">
 <dt id="fastlmm.association.heritability_spatial_correction">
-<code class="descclassname">fastlmm.association.</code><code class="descname">heritability_spatial_correction</code><span class="sig-paren">(</span><em>G_kernel</em>, <em>spatial_coor</em>, <em>spatial_iid</em>, <em>alpha_list</em>, <em>pheno</em>, <em>map_function=&lt;built-in function map&gt;</em>, <em>cache_folder=None</em>, <em>jackknife_count=500</em>, <em>permute_plus_count=10000</em>, <em>permute_times_count=10000</em>, <em>seed=0</em>, <em>just_testing=False</em><span class="sig-paren">)</span><a class="headerlink" href="#fastlmm.association.heritability_spatial_correction" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">fastlmm.association.</code><code class="descname">heritability_spatial_correction</code><span class="sig-paren">(</span><em>G_kernel</em>, <em>spatial_coor</em>, <em>spatial_iid</em>, <em>alpha_list</em>, <em>alpha_power</em>, <em>pheno</em>, <em>map_function=&lt;built-in function map&gt;</em>, <em>cache_folder=None</em>, <em>jackknife_count=500</em>, <em>permute_plus_count=10000</em>, <em>permute_times_count=10000</em>, <em>seed=0</em>, <em>just_testing=False</em>, <em>always_remote=False</em>, <em>allow_gxe2=True</em><span class="sig-paren">)</span><a class="headerlink" href="#fastlmm.association.heritability_spatial_correction" title="Permalink to this definition">¶</a></dt>
 <dd><p>Function measuring heritability with correction for spatial location.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -307,10 +307,11 @@ SNPs or the name of a BED file.</li>
 must be compatible so that distance can be determined via Pythagoras&#8217; theorem. (So, longitude and latitude should
 not be used unless the locations are near the Equator.)</li>
 <li><strong>spatial_iid</strong> (<em>array of strings with shape [iid_count,2]</em>) &#8211; A ndarray of the iids. Each iid is a ndarray of two strings (a family ID and a case ID) that identifies an individual.</li>
-<li><strong>alpha_list</strong> (<em>list of numbers</em>) &#8211; a list of numbers to search to find the best alpha, which is the similarity scale. The similarity of two individuals
-is here defined as exp(-distance_between/alpha). If the closest individuals are 100 units apart and the farthest
+<li><strong>alpha_list</strong> (<em>number</em>) &#8211; a list of numbers to search to find the best alpha, which is the similarity scale. The similarity of two individuals
+is here defined as exp(-(distance_between/alpha)**alpha_power). If the closest individuals are 100 units apart and the farthest
 individuals are 4e6 units apart, a reasonable alpha_list might be: [int(v) for v in np.logspace(np.log10(100),np.log10(1e10), 100)]
 The function&#8217;s reports on the alphas chosen. If an extreme alpha is picked, change alpha_list to cover more range.</li>
+<li><strong>alpha_power</strong> &#8211; 2 (a good choice) means that similarity goes with area. 1 means with distance.</li>
 <li><strong>pheno</strong> (a <code class="xref py py-class docutils literal"><span class="pre">SnpReader</span></code> or string) &#8211; The target values(s) to predict. It can be a file name readable via <code class="xref py py-class docutils literal"><span class="pre">SnpReader.Pheno</span></code> or any <code class="xref py py-class docutils literal"><span class="pre">SnpReader</span></code>.</li>
 <li><strong>cache_folder</strong> (<em>a string</em>) &#8211; (default &#8216;None&#8217;) The name of a directory in which to save intermediate results. If &#8216;None&#8217;, then no intermediate results are saved.</li>
 <li><strong>map_function</strong> (<em>a function</em>) &#8211; (default &#8216;map&#8217;) A function with the same inputs and functionality as Python&#8217;s &#8216;map&#8217; function.
