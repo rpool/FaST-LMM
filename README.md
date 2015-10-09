@@ -22,6 +22,14 @@ If you have pip installed, installation is as easy as:
 pip install fastlmm
 ```
 
+If that doesn't work, some things to try are:
+```
+conda update numpy
+conda update scipy
+pip uninstall fastlmm
+pip install fastlmm
+```
+
 
 ### Detailed Package Install Instructions:
 
