@@ -27,7 +27,7 @@ class IDistributable(object):
         # Can also yield IDistributable objects (thus the map-reduce can be nested).
         # If you like, you can define 'work_sequence_range' in terms of 'work_sequence'
         #         import itertools
-        #         return islice(self..work_sequence(),start,end)
+        #         return islice(self.work_sequence(),start,end)
         raise NotImplementedError( "Should have implemented this" )
 
 

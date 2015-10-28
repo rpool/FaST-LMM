@@ -6,12 +6,16 @@ See SamplePi.py for examples.
 
 from fastlmm.util.runner import *
 import os
-import cPickle as pickle
 import subprocess, sys, os.path
 import multiprocessing
 import fastlmm.util.util as util
 import pdb
 import logging
+try:
+    import dill as pickle
+except:
+    logging.warning("Can't import dill, so won't be able to clusterize lambda expressions. If you try you'll get this error 'Can't pickle <type 'function'>: attribute lookup __builtin__.function failed'")
+    import cPickle as pickle
 
 class HPC: # implements IRunner
     #!!LATER make it (and Hadoop) work from root directories -- or give a clear error message
