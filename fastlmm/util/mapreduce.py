@@ -1,5 +1,20 @@
 import logging
 from fastlmm.util.runner import *
+from contextlib import contextmanager
+import threading
+
+dyn = threading.local()
+
+# from short example in http://stackoverflow.com/questions/2001138/how-to-create-dynamical-scoped-variables-in-python999
+@contextmanager
+def dyn_vars(**new):
+    old = {}
+    for name, value in new.items():
+        old[name] = getattr(dyn, name, None)
+        setattr(dyn, name, value)
+    yield
+    for name, value in old.items():
+        setattr(dyn, name, value)
 
 class MapReduce(object): #implements IDistributable
     """
@@ -34,33 +49,29 @@ class MapReduce(object): #implements IDistributable
         return len(self.input_seq)
 
     def work_sequence_range(self, start, end):
-            #try: #Try random access
-            for i in xrange(start,end):
-                input_arg = self.input_seq[i]
-                if self.nested is None:
-                    logging.debug("random access executing %i" % i)#!!!cmk change to debug
-                    yield lambda i=i, input_arg=input_arg: self.dowork(i, input_arg)
-                    # the 'i=i',etc is need to get around a strangeness in Python
-                else:
-                    assert self.nested is not None, "real assert"
+        for i in xrange(start,end):
+            input_arg = self.input_seq[i]
+            if self.nested is None:
+                logging.debug("random access executing %i" % i)
+                with dyn_vars(is_in_nested=False):
+                    yield lambda i=i, input_arg=input_arg: self.dowork(i, input_arg)   # the 'i=i',etc is need to get around a strangeness in Python
+            else:
+                assert self.nested is not None, "real assert"
+                with dyn_vars(is_in_nested=True):
                     dist = apply(self.nested, [input_arg])
                     yield dist
-
-            #except: #If that doesn't work, start at the front
-            #    import itertools
-            #    for l in islice(self.work_sequence(),start,end):
-            #        yield l
 
     def work_sequence(self):
         for i, input_arg in enumerate(self.input_seq):
             if self.nested is None:
-                logging.debug("executing %i" % i) #!!!cmk change to debug
-                yield lambda i=i, input_arg=input_arg: self.dowork(i, input_arg)
-                # the 'i=i',etc is need to get around a strangeness in Python
+                logging.debug("executing %i" % i)
+                with dyn_vars(is_in_nested=False):
+                    yield lambda i=i, input_arg=input_arg: self.dowork(i, input_arg)  # the 'i=i',etc is need to get around a strangeness in Python
             else:
                 assert self.nested is not None, "real assert"
-                dist = apply(self.nested, [input_arg])
-                yield dist
+                with dyn_vars(is_in_nested=True):
+                    dist = apply(self.nested, [input_arg])
+                    yield dist
 
 
     def reduce(self, output_seq):
@@ -72,12 +83,15 @@ class MapReduce(object): #implements IDistributable
 
     #optional override -- the str name of the instance is used by the cluster as the job name
     def __str__(self):
-        return "{0}{1}".format(self.mapper.__name__, self.name or "" ) #!!!cmk fix up
+        if self.name is None:
+            return "map_reduce()"
+        else:
+            return self.name
  #end of IDistributable interface---------------------------------------
 
     def dowork(self, i, input_arg):
         #logging.info("{0}, {1}".format(len(train_snp_idx), len(test_snp_idx)))
-        logging.debug("executing %s" % str(input_arg))
+        logging.debug("executing {0}".format(input_arg))
         work = lambda : apply(self.mapper, [input_arg])
         result = run_all_in_memory(work)
         return result
@@ -100,16 +114,22 @@ class MapReduce(object): #implements IDistributable
 def identity(x):
     return x
 
-#!!!cmk test output files
-def map_reduce(input_seq,mapper=identity,nested=None,reducer=list,input_files=None, output_files=None,name=None,runner="simple"):
-    #!!!cmk need docs
-    if runner is "simple": #!!!change this to a class
-        result = reducer(mapper(x) for x in input_seq)
-    else:
-        dist = MapReduce(input_seq, mapper=mapper, nested=nested, reducer=reducer, input_files=input_files, output_files=output_files,name=name)
-        if runner is None:
-            return dist
-        else:
-            result = runner.run(dist)
-            return result
+def is_in_nested():
+    return hasattr(dyn,"is_in_nested") and dyn.is_in_nested
+
+def map_reduce(input_seq,mapper=identity,nested=None,reducer=list,input_files=None, output_files=None,name=None,runner=None):
+    #!!! need docs
+    if runner is None and nested is None and not is_in_nested():
+        result = reducer(apply(mapper,[x]) for x in input_seq)
+        return result
+
+    dist = MapReduce(input_seq, mapper=mapper, nested=nested, reducer=reducer, input_files=input_files, output_files=output_files,name=name)
+    if runner is None and is_in_nested():
+        return dist
+
+    if runner is None:
+        runner = Local()
+
+    result = runner.run(dist)
     return result
+    
