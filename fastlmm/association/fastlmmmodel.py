@@ -19,6 +19,10 @@ from pysnptools.kernelreader import KernelNpz
 def _snps_fixup(snp_input, iid_if_none=None):
     if isinstance(snp_input, str):
         return Bed(snp_input)
+
+    if isinstance(snp_input, dict):
+        return SnpData(iid=snp_input['iid'],sid=snp_input['header'],val=snp_input['vals'])
+
     if snp_input is None:
         assert iid_if_none is not None, "snp_input cannot be None here"
         return SnpData(iid_if_none, sid=np.empty((0),dtype='str'), val=np.empty((len(iid_if_none),0)),pos=np.empty((0,3)),parent_string="") #todo: make a static factory method on SnpData

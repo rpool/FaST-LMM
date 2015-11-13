@@ -1,7 +1,7 @@
 from fastlmm.util.runner import *
 import logging
 import fastlmm.pyplink.plink as plink
-import pysnptools.util.pheno as pstpheno
+from pysnptools.snpreader import Pheno
 import pysnptools.util as pstutil
 import fastlmm.util.util as flutil
 import numpy as np
@@ -11,12 +11,27 @@ from fastlmm.util.pickle_io import load, save
 import time
 import pandas as pd
 from fastlmm.inference.lmm_cov import LMM as fastLMM
+import warnings
+from pysnptools.snpreader import SnpReader
+from pysnptools.snpreader import SnpData
+from pysnptools.standardizer import Unit
+from pysnptools.standardizer import Identity as StandardizerIdentity
+from pysnptools.standardizer import DiagKtoN
+from pysnptools.kernelreader import Identity as KernelIdentity
+from pysnptools.kernelreader import KernelData
+from pysnptools.kernelreader import SnpKernel
+from pysnptools.kernelreader import KernelNpz
 
+
+
+#!!!cmk test that it works with two identity matrices -- even if it doesn't do linearregression shortcut
 def single_snp(test_snps,pheno,
-                 G0=None, G1=None, mixing=None,
+                 K0=None,
+                 K1=None, mixing=None, #!!!cmk c update comments, etc for G0->G0_or_K0
                  covar=None, output_file_name=None, h2=None, log_delta=None,
-                 cache_file = None):
+                 cache_file = None, G0=None, G1=None, force_full_rank=False, force_low_rank=False, batch_size=None, interact_with_snp=None, runner=None):
     """
+    #!!!cmk document batch_size, etc
     Function performing single SNP GWAS with REML
 
     :param test_snps: SNPs to test. If you give a string, it should be the base name of a set of PLINK Bed-formatted files.
@@ -29,7 +44,7 @@ def single_snp(test_snps,pheno,
     :param G0: SNPs from which to construct a similarity matrix.
           If you give a string, it should be the base name of a set of PLINK Bed-formatted files.
     :type G0: a :class:`.SnpReader` or a string
-
+    #!!!cmk update
     :param G1: SNPs from which to construct a second similarity kernel, optional. Also, see 'mixing').
           If you give a string, it should be the base name of a set of PLINK Bed-formatted files.
     :type G1: a :class:`.SnpReader` or a string
@@ -63,8 +78,10 @@ def single_snp(test_snps,pheno,
                 If given and the file does exist then G0 and G1 need not be given.
     :type cache_file: file name
 
-
-
+    :param interact_with_snp: index of a covariate to perform an interaction test with. 
+            Allows for interaction testing (interact_with_snp x snp will be tested)
+            default: None
+    :rtype: Pandas dataframe with one row per test SNP. Columns include "PValue"
 
 
     :rtype: Pandas dataframe with one row per test SNP. Columns include "PValue"
@@ -84,43 +101,37 @@ def single_snp(test_snps,pheno,
 
     """
     t0 = time.time()
-    test_snps = _snp_fixup(test_snps)
-    pheno = _pheno_fixup(pheno)
-    covar = _pheno_fixup(covar, iid_source_if_none=pheno)
 
-    if G0 is not None or G1 is not None:
-        G0 = _snp_fixup(G0)
-        G1 = _snp_fixup(G1, iid_source_if_none=G0)
-        G0, G1, test_snps, pheno, covar,  = pstutil.intersect_apply([G0, G1, test_snps, pheno, covar])
-        G0_standardized = G0.read().standardize()
-        G1_standardized = G1.read().standardize()
-    else:
-        test_snps, pheno, covar,  = pstutil.intersect_apply([test_snps, pheno, covar])
-        G0_standardized, G1_standardized = None, None
+    if runner is None:
+        runner = Local()
 
+    if force_full_rank and force_low_rank:
+        raise Exception("Can't force both full rank and low rank")
+    from fastlmm.association.fastlmmmodel import _snps_fixup, _pheno_fixup, _kernel_fixup
+    test_snps = _snps_fixup(test_snps)
+    pheno = _pheno_fixup(pheno).read()
+    assert pheno.sid_count == 1, "Expect pheno to be just one variable"
+    pheno = pheno[(pheno.val==pheno.val)[:,0],:] #!!!cmk is this a good idea?: remove NaN's from pheno before intersections (this means that the inputs will be standardized according to this pheno)
 
-    frame =  _internal_single(G0_standardized=G0_standardized, test_snps=test_snps, pheno=pheno,
-                                covar=covar, G1_standardized=G1_standardized, 
+    covar = _pheno_fixup(covar, iid_if_none=pheno.iid)
+    K0 = _kernel_fixup(K0 or G0, iid_if_none=test_snps.iid, standardizer=Unit())
+    K1 = _kernel_fixup(K1 or G1, iid_if_none=test_snps.iid, standardizer=Unit())
+
+    K0, K1, test_snps, pheno, covar  = pstutil.intersect_apply([K0, K1, test_snps, pheno, covar]) #!!!cmk fix up util's intersect_apply and then use it instead
+    logging.debug("# of iids now {0}".format(K0.iid_count))
+
+    frame =  _internal_single(K0_standardized=K0, test_snps=test_snps, pheno=pheno,
+                                covar=covar, K1_standardized=K1,
                                 mixing=mixing, h2=h2, log_delta=log_delta,
-                                cache_file = cache_file)
+                                cache_file = cache_file, force_full_rank=force_full_rank,force_low_rank=force_low_rank,
+                                output_file_name=output_file_name,batch_size=batch_size, interact_with_snp=interact_with_snp,
+                                runner=runner)
 
-    frame.sort("PValue", inplace=True)
-    frame.index = np.arange(len(frame))
-
-
-    if output_file_name is not None:
-        frame.to_csv(output_file_name, sep="\t", index=False)
-
-    logging.info("PhenotypeName\t{0}".format(pheno['header']))
-    if G0 is not None:
-        logging.info("SampleSize\t{0}".format(G0.iid_count))
-        logging.info("SNPCount\t{0}".format(G0.sid_count))
-    logging.info("Runtime\t{0}".format(time.time()-t0))
-
+    from pysnptools.util.intrangeset import IntRangeSet
+    sid_index_range = IntRangeSet(frame['sid_index'])
+    assert sid_index_range == (0,test_snps.sid_count), "Some SNP rows are missing from the output"
 
     return frame
-
-    
 
 #!!might one need to pre-compute h2 for each chrom?
 #!!clusterize????
@@ -186,10 +197,10 @@ def single_snp_leave_out_one_chrom(test_snps, pheno,
 
     """
     t0 = time.time()
-    test_snps = _snp_fixup(test_snps)
-    G1 = _snp_fixup(G1, iid_source_if_none=test_snps)
-    pheno = _pheno_fixup(pheno)
-    covar = _pheno_fixup(covar, iid_source_if_none=pheno)
+    test_snps = _old_snp_fixup(test_snps)
+    G1 = _old_snp_fixup(G1, iid_source_if_none=test_snps)
+    pheno = _old_pheno_fixup(pheno)
+    covar = _old_pheno_fixup(covar, iid_source_if_none=pheno)
     test_snps, G1, pheno, covar,  = pstutil.intersect_apply([test_snps, G1, pheno, covar])
     G0_standardized = test_snps.read().standardize()
     G1_standardized = G1.read().standardize()
@@ -204,7 +215,7 @@ def single_snp_leave_out_one_chrom(test_snps, pheno,
         G1_standardized_chrom = G1_standardized[:,G1_standardized.pos[:,0] != chrom].read() # train on snps that don't match the chrom
         covar_chrom = _create_covar_chrom(covar, covar_by_chrom, chrom)
 
-        frame_chrom = _internal_single(G0_standardized=G0_standardized_chrom, test_snps=test_snps_chrom, pheno=pheno,
+        frame_chrom = _old_internal_single(G0_standardized=G0_standardized_chrom, test_snps=test_snps_chrom, pheno=pheno,
                                 covar=covar_chrom, G1_standardized=G1_standardized_chrom, mixing=mixing,
                                 h2=h2, log_delta=log_delta, cache_file=None, interact_with_snp=interact_with_snp)
 
@@ -225,7 +236,7 @@ def single_snp_leave_out_one_chrom(test_snps, pheno,
     return frame
 
 
-def _find_mixing(G, covar, G0_standardized_val, G1_standardized_val, h2, y):
+def _old_find_mixing(G, covar, G0_standardized_val, G1_standardized_val, h2, y):
     import fastlmm.util.mingrid as mingrid
     assert h2 is None, "if mixing is None, expect h2 to also be None"
     resmin=[None]
@@ -240,7 +251,154 @@ def _find_mixing(G, covar, G0_standardized_val, G1_standardized_val, h2, y):
     h2 = resmin[0]['h2']
     return mixing, h2
 
-def _internal_single(G0_standardized, test_snps, pheno,covar, G1_standardized,
+#!!!cmk figureout when read's and read(view_ok=True) should be used
+#!!!cmk add code to test force_full_rank=False, force_low_rank=False
+def _combine_the_best_way(K0_standardized,K1_standardized,covar,y,mixing,h2,force_full_rank=False, force_low_rank=False):
+    if force_full_rank and force_low_rank:
+        raise Exception("Can't force both full rank and low rank")
+
+    ##########################
+    # A special case: both kernels are the Identity so just return the first one
+    ##########################
+    if isinstance(K0_standardized,KernelIdentity) and isinstance(K1_standardized,KernelIdentity):
+        return K0_standardized, mixing or 0, h2 or 0, False
+
+    ##########################
+    # Special cases: mixing says to use just one kernel or the other kernel is just identity, so just return one kernel
+    ##########################
+    if mixing == 0.0 or isinstance(K1_standardized,KernelIdentity):
+        return K0_standardized, mixing or 0.0, h2, False #!!!cmk is "read" needed because "standardize" will be inplace?
+
+    if mixing == 1.0 or isinstance(K0_standardized,KernelIdentity):
+        return K1_standardized, mixing or 1.0, h2, False #!!!cmk is "read" needed because "standardize" will be inplace?
+
+    ##########################
+    # A special case: Treat the kernels as collections of snps (i.e. low-rank)
+    ##########################
+    #!!!cmk define sid_count
+    if (isinstance(K0_standardized,SnpKernel) and isinstance(K1_standardized,SnpKernel) and not force_full_rank
+        and (force_low_rank or K0_standardized.sid_count + K1_standardized.sid_count < K0_standardized.iid_count)):
+
+            G = np.empty((K0_standardized.iid_count, K0_standardized.sid_count + K1_standardized.sid_count))
+            # These two need to allocate their own memory so that they can be copied into G over and over again quickly
+            G0_standardized_val = K0_standardized.read_snps().standardize(DiagKtoN()).val
+            G1_standardized_val = K1_standardized.read_snps().standardize(DiagKtoN()).val
+
+            if mixing is None:
+                mixing, h2 = _find_mixing_from_Gs(G, covar, G0_standardized_val, G1_standardized_val, h2, y)
+            _mix_from_Gs(G, G0_standardized_val,G1_standardized_val,mixing)
+        
+            snpdata = SnpData(iid=K0_standardized.iid,
+                              sid=np.concatenate((K0_standardized.sid,K1_standardized.sid),axis=0),
+                              val=G,parent_string="{0}&{1}".format(G0_standardized_val,G1_standardized_val),
+                              pos=np.concatenate((K0_standardized.pos,K1_standardized.pos),axis=0)
+                              )
+            return SnpKernel(snpdata,StandardizerIdentity()), mixing, h2, True
+
+    ##########################
+    # The most general case, treat the new kernels as kernels (i.e.. full rank)
+    ##########################
+    # These two need to allocate their own memory so that they can be copied into K over and over again quickly (otherwise they might be reading from file over and over again or changing memory used for something else)
+    K0_data = K0_standardized.read().standardize() 
+    K1_data = K1_standardized.read().standardize()
+    K = np.empty(K0_data.val.shape)
+    if mixing is None:
+        mixing, h2 = _find_mixing_from_Ks(K, covar, K0_data.val, K1_data.val, h2, y)
+    _mix_from_Ks(K, K0_data.val, K1_data.val, mixing)
+    assert K.shape[0] == K.shape[1] and abs(np.diag(K).sum() - K.shape[0]) < 1e-7, "Expect mixed K to be standardized"
+    from pysnptools.kernelreader import KernelData
+    return KernelData(val=K,iid=K0_data.iid), mixing, h2, True
+
+def _internal_single(K0_standardized, test_snps, pheno, covar, K1_standardized,
+                 mixing, #!!test mixing and G1
+                 h2, log_delta,
+                 cache_file, force_full_rank,force_low_rank,
+                 output_file_name, batch_size, interact_with_snp, runner):
+    assert mixing is None or 0.0 <= mixing <= 1.0
+    if force_full_rank and force_low_rank:
+        raise Exception("Can't force both full rank and low rank")
+
+    assert h2 is None or log_delta is None, "if h2 is specified, log_delta may not be specified"
+    if log_delta is not None:
+        h2 = 1.0/(np.exp(log_delta)+1)
+
+    covar = np.hstack((covar.read(view_ok=True).val,np.ones((test_snps.iid_count, 1))))  #We always add 1's to the end.
+
+    y =  pheno.read(view_ok=True).val
+
+    if cache_file is not None and os.path.exists(cache_file):
+        lmm = fastLMM(X=covar, Y=y, G=None, K=None)
+        with np.load(cache_file) as data: #!! similar code in epistasis
+            lmm.U = data['arr_0']
+            lmm.S = data['arr_1']
+            h2 = data['arr_2'][0]
+            mixing = data['arr_2'][1] if len(data['arr_2'])==2 else np.nan #!!!cmk remove this "if". It's here for temporary compatibility the with cache file
+    else:
+        assert K0_standardized.iid0 is K0_standardized.iid1 and K1_standardized.iid0 is K1_standardized.iid1, "Expect K0 and K1 to be square"
+        K, mixing, h2, in_place_ok = _combine_the_best_way(K0_standardized,K1_standardized,covar,y,mixing,h2,force_full_rank=force_full_rank,force_low_rank=force_low_rank)
+        #!!!cmk if both kernels are None (or identity) should just call linear regression
+        if (isinstance(K,SnpKernel) and not force_full_rank and (force_low_rank or K.sid_count < K.iid_count)):
+            if not in_place_ok:
+                G = K.read_snps().standardize(DiagKtoN())
+            else:
+                G = K.read_snps(view_ok=True)
+            lmm = fastLMM(X=covar, Y=y, K=None, G=G.val, inplace=True)
+        else:
+            if not in_place_ok:
+                K = K.read().standardize()
+            lmm = fastLMM(X=covar, Y=y, K=K.val, G=None, inplace=True)
+
+        if h2 is None:
+            result = lmm.findH2()
+            h2 = result['h2']
+        logging.info("h2={0}".format(h2))
+
+        if cache_file is not None and not os.path.exists(cache_file):
+            pstutil.create_directory_if_necessary(cache_file)
+            lmm.getSU()
+            np.savez(cache_file, lmm.U,lmm.S,np.array([h2,mixing])) #using np.savez instead of pickle because it seems to be faster to read and write
+
+    if interact_with_snp is not None:
+        logging.info("interaction with %i" % interact_with_snp)
+        assert 0 <= interact_with_snp and interact_with_snp < covar.shape[1]-1, "interact_with_snp is out of range"
+        interact_with_snp_covar = covar[:,interact_with_snp]
+    else:
+        interact_with_snp_covar = None
+    singlesnp = _SingleSnp(test_snps, mixing, h2, lmm, batch_size, output_file_name, interact_with_snp_covar)
+    frame = runner.run(singlesnp)
+    
+
+    #delete
+    #snps_read = test_snps.read().standardize() #!!!could it be better to standardize train (if available) and test together?
+    #res = lmm.nLLeval(h2=h2, dof=None, scale=1.0, penalty=0.0, snps=snps_read.val)
+
+
+    #beta = res['beta']
+        
+    #chi2stats = beta*beta/res['variance_beta']
+    ##p_values = stats.chi2.sf(chi2stats,1)[:,0]
+    #assert K0_standardized.iid_count == lmm.U.shape[0]
+    #p_values = stats.f.sf(chi2stats,1,lmm.U.shape[0]-3)[:,0]#note that G.shape is the number of individuals and 3 is the number of fixed effects (covariates+SNP)
+
+
+    #items = [
+    #    ('SNP', snps_read.sid),
+    #    ('Chr', snps_read.pos[:,0]), 
+    #    ('GenDist', snps_read.pos[:,1]),
+    #    ('ChrPos', snps_read.pos[:,2]), 
+    #    ('PValue', p_values),
+    #    ('SnpWeight', beta[:,0]),
+    #    ('SnpWeightSE', np.sqrt(res['variance_beta'][:,0])),
+    #    ('SnpFractVarExpl', np.sqrt(res['fraction_variance_explained_beta'][:,0])),
+    #    ('Mixing', mixing),
+    #    ('Nullh2', np.zeros((snps_read.sid_count)) + h2)
+    #]
+    #frame = pd.DataFrame.from_items(items)
+
+    return frame
+
+
+def _old_internal_single(G0_standardized, test_snps, pheno,covar, G1_standardized,
                  mixing, #!!test mixing and G1
                  h2, log_delta,
                  cache_file, interact_with_snp=None):
@@ -273,8 +431,8 @@ def _internal_single(G0_standardized, test_snps, pheno,covar, G1_standardized,
         else:
             G = np.empty((G0_standardized.iid_count,G0_standardized.sid_count+G1_standardized.sid_count))
             if mixing is None:
-                mixing, h2 = _find_mixing(G, covar, G0_standardized_val, G1_standardized_val, h2, y)
-            _mix(G, G0_standardized_val,G1_standardized_val,mixing)
+                mixing, h2 = _old_find_mixing(G, covar, G0_standardized_val, G1_standardized_val, h2, y)
+            _old_mix(G, G0_standardized_val,G1_standardized_val,mixing)
         
         #TODO: make sure low-rank case is handled correctly
         lmm = fastLMM(X=covar, Y=y, G=G, K=None, inplace=True)
@@ -288,7 +446,8 @@ def _internal_single(G0_standardized, test_snps, pheno,covar, G1_standardized,
     snps_read = test_snps.read().standardize()
     
     if interact_with_snp is not None:
-        print "interaction with %i" % interact_with_snp
+        logging.info("interaction with %i" % interact_with_snp)
+        assert 0 <= interact_with_snp and interact_with_snp < covar.shape[1]-1, "interact_with_snp is out of range"
         interact = covar[:,interact_with_snp]
         interact -=interact.mean()
         interact /= interact.std()
@@ -326,7 +485,7 @@ def _internal_single(G0_standardized, test_snps, pheno,covar, G1_standardized,
 
     return frame
 
-def _mix(G, G0_standardized_val, G1_standardized_val, mixing):
+def _old_mix(G, G0_standardized_val, G1_standardized_val, mixing):
     #logging.info("concat G1, mixing {0}".format(mixing))
     G[:,0:G0_standardized_val.shape[1]] = G0_standardized_val
     G[:,0:G0_standardized_val.shape[1]] *= (np.sqrt(1.0-mixing))
@@ -337,7 +496,7 @@ def _mix(G, G0_standardized_val, G1_standardized_val, mixing):
 def _create_covar_chrom(covar, covar_by_chrom, chrom):
     if covar_by_chrom is not None:
         covar_by_chrom_chrom = covar_by_chrom[chrom]
-        covar_by_chrom_chrom = _pheno_fixup(covar_by_chrom_chrom, iid_source_if_none=covar)
+        covar_by_chrom_chrom = _old_pheno_fixup(covar_by_chrom_chrom, iid_source_if_none=covar)
         covar_after,  covar_by_chrom_chrom = pstutil.intersect_apply([covar,  covar_by_chrom_chrom])
         assert np.all(covar_after['iid'] == covar['iid']), "covar_by_chrom must contain all iids found in the intersection of the other datasets"
 
@@ -351,7 +510,8 @@ def _create_covar_chrom(covar, covar_by_chrom, chrom):
         return covar
 
 
-def _snp_fixup(snp_input, iid_source_if_none=None):
+#!!!cmk
+def _old_snp_fixup(snp_input, iid_source_if_none=None):
     if isinstance(snp_input, str):
         return Bed(snp_input)
     elif snp_input is None:
@@ -359,7 +519,8 @@ def _snp_fixup(snp_input, iid_source_if_none=None):
     else:
         return snp_input
 
-def _pheno_fixup(pheno_input, iid_source_if_none=None):
+def _old_pheno_fixup(pheno_input, iid_source_if_none=None):
+    import pysnptools.util.pheno as pstpheno
     if isinstance(pheno_input, str):
         return pstpheno.loadPhen(pheno_input) #!!what about missing=-9?
 
@@ -381,7 +542,246 @@ def _pheno_fixup(pheno_input, iid_source_if_none=None):
 
     return pheno_input
 
+# could this be written without the inside-out of IDistributable?
+class _SingleSnp(object) : #implements IDistributable
 
+    def create_output_dir_if_needed(self):
+        if self.output_file_or_none is not None:
+            from pysnptools.util import create_directory_if_necessary
+            create_directory_if_necessary(self.output_file_or_none)
+
+    def __init__(self,test_snps,mixing,h2,lmm,batch_size,output_file_or_none,interact_with_snp_covar):
+        self.test_snps = test_snps
+        self.mixing = mixing
+        self.h2 = h2
+        self.lmm = lmm
+        self.batch_size = batch_size
+        self.output_file_or_none=output_file_or_none
+        self.create_output_dir_if_needed()
+        self._str = "{0}(output_file={1})".format(self.__class__.__name__, output_file_or_none)
+        self._ran_once = False
+        self.interact_with_snp_covar = interact_with_snp_covar
+
+
+    def _run_once(self):
+        if self._ran_once:
+            return
+        self._ran_once = None
+
+        if self.batch_size is None:
+            self.batch_size = self.test_snps.sid_count
+
+        self._work_count = -(self.test_snps.sid_count // -self.batch_size) #Find the work count based on batch size (rounding up)
+
+        if self.output_file_or_none is None:
+            self.__tempdirectory = ".working"
+        else:
+            self.__tempdirectory = self.output_file_or_none + ".working"
+        
+
+ #start of IDistributable interface--------------------------------------
+    @property
+    def work_count(self):
+        self._run_once()
+        return self._work_count
+
+    #def work_sequence_range(self, start, end): #implement this efficiently
+
+    def work_sequence(self):
+        self._run_once()
+
+        start = 0
+        for work_index in xrange(self._work_count):
+            end = self.test_snps.sid_count * (1 + work_index) // self._work_count
+            yield lambda work_index=work_index,start=start,end=end : self.do_work(work_index,start,end)  # the 'start=start,...' is need to get around a strangeness in Python
+            start = end
+
+    #!!!cmk update
+    def reduce(self, result_sequence):
+        #doesn't need "run_once()"
+
+        self.create_output_dir_if_needed()
+
+        frame = pd.concat(result_sequence)
+
+        frame.sort("PValue", inplace=True)
+        frame.index = np.arange(len(frame))
+
+        if self.output_file_or_none is not None:
+            frame.to_csv(self.output_file_or_none, sep="\t", index=False)
+
+        #logging.info("PhenotypeName\t{0}".format(",".join(pheno.sid)))
+        #if K0 is not None:
+        #    logging.info("SampleSize\t{0}".format(len(K0.iid)))
+        #    logging.info("K0 \t{0}".format(K0))
+
+        #logging.info("Runtime\t{0}".format(time.time()-t0))
+
+
+
+        return frame
+
+    @property
+    def tempdirectory(self):
+        self._run_once()
+        return self.__tempdirectory
+
+    #optional override -- the str name of the instance is used by the cluster as the job name
+    def __str__(self):
+        #Doesn't need run_once
+        return self._str
+
+
+    def copyinputs(self, copier):
+        #Doesn't need run_once
+        copier.input(self.test_snps)
+
+    def copyoutputs(self,copier):
+        #Doesn't need run_once
+        copier.output(self.output_file_or_none)
+
+ #end of IDistributable interface---------------------------------------
+
+    #!!!cmk what are these for?
+    do_pheno_count = 0
+    do_pheno_time = time.time()
+
+    def create_dataframe(self,row_count):
+        dataframe = pd.DataFrame(
+            index=np.arange(row_count),
+            columns=('sid_index', 'SNP', 'Chr', 'GenDist', 'ChrPos', 'PValue', 'SnpWeight', 'SnpWeightSE','SnpFractVarExpl','Mixing', 'Nullh2')
+            )
+        #!!Is this the only way to set types in a dataframe?
+        dataframe['sid_index'] = dataframe['sid_index'].astype(np.float)
+        dataframe['Chr'] = dataframe['Chr'].astype(np.float)
+        dataframe['GenDist'] = dataframe['GenDist'].astype(np.float)
+        dataframe['ChrPos'] = dataframe['ChrPos'].astype(np.float)
+        dataframe['ChrPos'] = dataframe['ChrPos'].astype(np.float)
+        dataframe['SnpWeight'] = dataframe['SnpWeight'].astype(np.float)
+        dataframe['SnpWeightSE'] = dataframe['SnpWeightSE'].astype(np.float)
+        dataframe['SnpFractVarExpl'] = dataframe['SnpFractVarExpl'].astype(np.float)
+        dataframe['Mixing'] = dataframe['Mixing'].astype(np.float)
+        dataframe['Nullh2'] = dataframe['Nullh2'].astype(np.float)
+
+        return dataframe
+
+    do_work_count = 0
+    do_work_time = time.time()
+
+    def do_work(self, work_index, start,end):
+        logging.info("Working on part {0} of {1}".format(work_index,self.work_count))
+
+        #!!!cmk need to test this
+        snps_read = self.test_snps[:,start:end].read().standardize() #!!!could it be better to standardize train (if available) and test together?
+        if self.interact_with_snp_covar is not None:
+            interact = self.interact_with_snp_covar.copy()
+            interact -=interact.mean()
+            interact /= interact.std()
+            variables_to_test = snps_read.val * interact[:,np.newaxis]
+        else:
+            variables_to_test = snps_read.val
+        #was res = self.lmm.nLLeval(h2=self.h2, dof=None, scale=1.0, penalty=0.0, snps=snps_read.val)
+        res = self.lmm.nLLeval(h2=self.h2, dof=None, scale=1.0, penalty=0.0, snps=variables_to_test)
+
+
+
+
+        beta = res['beta']
+        
+        chi2stats = beta*beta/res['variance_beta']
+        #p_values = stats.chi2.sf(chi2stats,1)[:,0]
+        assert self.test_snps.iid_count == self.lmm.U.shape[0]
+        p_values = stats.f.sf(chi2stats,1,self.lmm.U.shape[0]-3)[:,0]#note that G.shape is the number of individuals and 3 is the number of fixed effects (covariates+SNP)
+
+        dataframe = self.create_dataframe(snps_read.sid_count)
+        dataframe['sid_index'] = np.arange(start,end)
+        dataframe['SNP'] = snps_read.sid
+        dataframe['Chr'] = snps_read.pos[:,0]
+        dataframe['GenDist'] = snps_read.pos[:,1]
+        dataframe['ChrPos'] = snps_read.pos[:,2] 
+        dataframe['PValue'] = p_values
+        dataframe['SnpWeight'] = beta[:,0]
+        dataframe['SnpWeightSE'] = np.sqrt(res['variance_beta'][:,0])
+        dataframe['SnpFractVarExpl'] = np.sqrt(res['fraction_variance_explained_beta'][:,0])
+        dataframe['Mixing'] = np.zeros((snps_read.sid_count)) + self.mixing
+        dataframe['Nullh2'] = np.zeros((snps_read.sid_count)) + self.h2
+
+        self.do_work_count += 1
+        if self.do_work_count % 1 == 0:
+            start = self.do_work_time
+            self.do_work_time = time.time()
+            logging.info("do_work_count={0}, time={1}".format(self.do_work_count,self.do_work_time-start))
+
+        logging.info(dataframe)
+        return dataframe
+
+def _find_mixing_from_Gs(G, covar, G0_standardized_val, G1_standardized_val, h2, y):
+    logging.info("starting _find_mixing_from_Gs")
+    import fastlmm.util.mingrid as mingrid
+    assert h2 is None, "if mixing is None, expect h2 to also be None"
+    resmin=[None]
+    def f(mixing,G0_standardized_val=G0_standardized_val,G1_standardized_val=G1_standardized_val,covar=covar,y=y,**kwargs):
+
+        if not isinstance(mixing, (int, long, float, complex)): #!!!cmk
+            assert mixing.ndim == 1 and mixing.shape[0] == 1
+            mixing = mixing[0]
+
+        _mix_from_Gs(G, G0_standardized_val,G1_standardized_val,mixing)
+        lmm = fastLMM(X=covar, Y=y, G=G, K=None, inplace=True)
+        result = lmm.findH2()
+        if (resmin[0] is None) or (result['nLL']<resmin[0]['nLL']):
+            resmin[0]=result
+        logging.info("mixing_from_Gs\t{0}\th2\t{1}\tnLL\t{2}".format(mixing,result['h2'],result['nLL']))
+        #logging.info("reporter:counter:single_snp,find_mixing_from_Gs_count,1")
+        assert not np.isnan(result['nLL']), "nLL should be a number (not a NaN)"
+        return result['nLL'] #!!!cmk what does switching to -log likelihood to to single_snp?
+    mixing,nLL = mingrid.minimize1D(f=f, nGrid=10, minval=0.0, maxval=1.0,verbose=False)
+
+    if not isinstance(mixing, (int, long, float, complex)): #!!!cmk
+        assert mixing.ndim == 1 and mixing.shape[0] == 1
+        mixing = mixing[0]
+
+    h2 = resmin[0]['h2']
+    return mixing, h2
+
+def _find_mixing_from_Ks(K, covar, K0_val, K1_val, h2, y):
+    logging.debug("starting _find_mixing_from_Ks")
+    import fastlmm.util.mingrid as mingrid
+    assert h2 is None, "if mixing is None, expect h2 to also be None"
+    resmin=[None]
+    def f(mixing,K0_val=K0_val,K1_val=K1_val,covar=covar,y=y,**kwargs):
+
+        if not isinstance(mixing, (int, long, float, complex)): #!!!cmk
+            assert mixing.ndim == 1 and mixing.shape[0] == 1
+            mixing = mixing[0]
+
+        _mix_from_Ks(K, K0_val,K1_val,mixing)
+        lmm = fastLMM(X=covar, Y=y, G=None, K=K, inplace=True)
+        result = lmm.findH2()
+        if (resmin[0] is None) or (result['nLL']<resmin[0]['nLL']):
+            resmin[0]=result
+        logging.debug("mixing_from_Ks\t{0}\th2\t{1}\tnLL\t{2}".format(mixing,result['h2'],result['nLL']))
+        #logging.info("reporter:counter:single_snp,find_mixing_from_Ks_count,1")
+        assert not np.isnan(result['nLL']), "nLL should be a number (not a NaN)"
+        return result['nLL'] #!!!cmk what does switching to -log likelihood to to single_snp?
+    mixing,nLL = mingrid.minimize1D(f=f, nGrid=10, minval=0.0, maxval=1.0,verbose=False)
+
+    if not isinstance(mixing, (int, long, float, complex)): #!!!cmk
+        assert mixing.ndim == 1 and mixing.shape[0] == 1
+        mixing = mixing[0]
+
+    h2 = resmin[0]['h2']
+    return mixing, h2
+
+def _mix_from_Gs(G, G0_standardized_val, G1_standardized_val, mixing):
+    #logging.info("concat G1, mixing {0}".format(mixing))
+    G[:,0:G0_standardized_val.shape[1]] = G0_standardized_val
+    G[:,0:G0_standardized_val.shape[1]] *= (np.sqrt(1.0-mixing))
+    G[:,G0_standardized_val.shape[1]:] = G1_standardized_val
+    G[:,G0_standardized_val.shape[1]:] *= np.sqrt(mixing)
+
+def _mix_from_Ks(K, K0_val, K1_val, mixing):
+    K[:,:] = K0_val * (1.0-mixing) + K1_val * mixing #!!!cmk does this avoid memory allocation? Is there a way to avoid memory allocation?
 
 if __name__ == "__main__":
 

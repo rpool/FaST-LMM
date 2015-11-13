@@ -22,7 +22,7 @@ class LocalInParts: # implements IRunner
         logger.addHandler(logging_handler)
 
         self.run_dir = run_dir
-        self.result_file = os.path.join(run_dir,result_file)
+        self.result_file = os.path.join(run_dir,result_file) if result_file else None
         self.taskindex = taskindex
         self.taskcount = taskcount
         if mkl_num_threads != None:

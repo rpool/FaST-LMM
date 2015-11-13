@@ -10,6 +10,9 @@ from fastlmm.association import single_snp_leave_out_one_chrom
 import pysnptools.util.pheno as pstpheno
 from fastlmm.feature_selection.test import TestFeatureSelection
 from fastlmm.util.runner import Local, HPC, LocalMultiProc
+from pysnptools.kernelreader import  Identity as KernelIdentity
+from pysnptools.kernelreader import SnpKernel
+from pysnptools.standardizer import Unit
 
 class TestSingleSnp(unittest.TestCase):
 
@@ -52,7 +55,7 @@ class TestSingleSnp(unittest.TestCase):
                 sid = row.SNP
                 pvalue = frame[frame['SNP'] == sid].iloc[0].PValue
                 reldiff = abs(row.Pvalue - pvalue)/row.Pvalue
-                assert reldiff < .035, "'{0}' pvalue_list differ too much {4} -- {2} vs {3}".format(sid,None,row.PValue,pvalue,reldiff)
+                assert reldiff < .035, "'{0}' pvalue_list differ too much {4} -- {2} vs {3}".format(sid,None,row.Pvalue,pvalue,reldiff)
  
     def file_name(self,testcase_name):
         temp_fn = os.path.join(self.tempout_dir,testcase_name+".txt")
@@ -75,6 +78,37 @@ class TestSingleSnp(unittest.TestCase):
 
         self.compare_files(frame,"mixing")
 
+    def test_mixingKs(self):
+        logging.info("TestSingleSnp test_mixingKs")
+        from pysnptools.snpreader import Bed
+        test_snps = Bed(self.bedbase)
+        pheno = self.phen_fn
+        covar = self.cov_fn
+
+        output_file_name = self.file_name("mixingKs")
+        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno,K0=SnpKernel(test_snps[:,10:100],Unit()).read(),
+                                      covar=covar, K1=SnpKernel(test_snps[:,100:200],Unit()).read(),mixing=None,
+                                      output_file_name=output_file_name
+                                      )
+
+        self.compare_files(frame,"mixing")
+
+
+    def test_mixid(self):
+        logging.info("TestSingleSnp test_mixid")
+        from pysnptools.snpreader import Bed
+        test_snps = Bed(self.bedbase)
+        pheno = self.phen_fn
+        covar = self.cov_fn
+
+        output_file_name = self.file_name("mixid")
+        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno,G0=test_snps[:,10:100], 
+                                      covar=covar, K1=KernelIdentity(test_snps.iid),mixing=.25,
+                                      output_file_name=output_file_name
+                                      )
+
+        self.compare_files(frame,"mixid")
+
 
     def test_one(self):
         logging.info("TestSingleSnp test_one")
@@ -90,6 +124,51 @@ class TestSingleSnp(unittest.TestCase):
                                   )
 
         self.compare_files(frame,"one")
+
+    def test_other(self):
+        logging.info("TestSingleSnp test_other")
+        from pysnptools.snpreader import Bed
+        test_snps = Bed(self.bedbase)
+        pheno = self.phen_fn
+        covar = self.cov_fn
+
+        output_file = self.file_name("other")
+        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno,
+                                  K1=test_snps, covar=covar, 
+                                  output_file_name=output_file
+                                  )
+
+        self.compare_files(frame,"one")
+
+    def test_none(self):
+        logging.info("TestSingleSnp test_none")
+        from pysnptools.snpreader import Bed
+        test_snps = Bed(self.bedbase)
+        pheno = self.phen_fn
+        covar = self.cov_fn
+
+        output_file = self.file_name("none")
+        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno, mixing=0,
+                                  K0=KernelIdentity(test_snps.iid), covar=covar, 
+                                  output_file_name=output_file
+                                  )
+
+        self.compare_files(frame,"none")
+
+    def test_interact(self):
+        logging.info("TestSingleSnp test_interact")
+        from pysnptools.snpreader import Bed
+        test_snps = Bed(self.bedbase)
+        pheno = self.phen_fn
+        covar = self.cov_fn
+
+        output_file = self.file_name("interact")
+        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno, mixing=0,
+                                  G0=test_snps, covar=covar, interact_with_snp=1,
+                                  output_file_name=output_file
+                                  )
+
+        self.compare_files(frame,"interact")
 
     def test_preload_files(self):
         logging.info("TestSingleSnp test_preload_files")
@@ -160,6 +239,7 @@ class TestSingleSnp(unittest.TestCase):
         output_file_name = self.file_name("no_cov_b")
         covar = pstpheno.loadPhen(self.cov_fn)
         covar['vals'] = np.delete(covar['vals'], np.s_[:],1) #Remove all the columns
+        covar['header'] = []
 
         frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno, G0=test_snps, 
                                   covar=covar, mixing=0,
@@ -321,6 +401,21 @@ class TestSingleSnpLeaveOutOneChrom(unittest.TestCase):
 
         self.compare_files(frame,"one_looc")
 
+    def test_interact_looc(self):
+        logging.info("TestSingleSnpLeaveOutOneChrom test_interact_looc")
+        from pysnptools.snpreader import Bed
+        test_snps = Bed(self.bedbase)
+        pheno = self.phen_fn
+        covar = self.cov_fn
+
+        output_file = self.file_name("interact_looc")
+        frame = single_snp_leave_out_one_chrom(test_snps, pheno,
+                                  covar=covar, mixing=0, interact_with_snp=0,
+                                  output_file_name=output_file
+                                  )
+
+        self.compare_files(frame,"interact_looc")
+
     def test_covar_by_chrom(self):
             logging.info("TestSingleSnpLeaveOutOneChrom test_covar_by_chrom")
             from pysnptools.snpreader import Bed
@@ -369,13 +464,12 @@ class TestSingleSnpLeaveOutOneChrom(unittest.TestCase):
 
         reference=pd.read_csv(reffile,delimiter='\s',comment=None)
         assert len(frame) == len(reference), "# of pairs differs from file '{0}'".format(reffile)
-        for _, row in reference.iterrows():
-            sid = row.SNP
-            pvalue = frame[frame['SNP'] == sid].iloc[0].PValue
-            assert abs(row.PValue - pvalue) < 1e-5, "snp {0} differs too much from file '{1}'".format(sid,reffile)
-
-
-        
+        frame.set_index('SNP',inplace=True)
+        reference.set_index('SNP',inplace=True)
+        diff = (frame.PValue-reference.PValue)
+        bad = diff[np.abs(diff)>1e-5]
+        if len(bad) > 0:
+            raise Exception("snps differ too much from file '{0}' at these snps {1}".format(reffile,bad))
 
 
 def getTestSuite():
@@ -392,8 +486,8 @@ if __name__ == '__main__':
     from fastlmm.association.tests.test_single_snp import TestSingleSnp
     suites = unittest.TestSuite([getTestSuite()])
 
-    if True: #Standard test run
-        r = unittest.TextTestRunner(failfast=True)
+    if True: #Standard test run #!!!cmk
+        r = unittest.TextTestRunner(failfast=False)
         r.run(suites)
     else: #Cluster test run
         logging.basicConfig(level=logging.INFO)
@@ -405,7 +499,7 @@ if __name__ == '__main__':
                      remote_python_parent=r"\\msr-arrays\Scratch\msr-pool\Scratch_Storage4\REDMOND\carlk\Source\carlk\july_7_14\tests\runs\2014-07-24_15_02_02_554725991686\pythonpath",
                      update_remote_python_parent=True,
                      priority="AboveNormal",mkl_num_threads=1)
-        runner = Local()
+        #runner = Local()
         #runner = LocalMultiProc(taskcount=20,mkl_num_threads=5)
         #runner = LocalInParts(1,2,mkl_num_threads=1) # For debugging the cluster runs
         #runner = Hadoop(100, mapmemory=8*1024, reducememory=8*1024, mkl_num_threads=1, queue="default")
