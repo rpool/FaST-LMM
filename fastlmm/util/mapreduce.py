@@ -117,7 +117,7 @@ def identity(x):
 def is_in_nested():
     return hasattr(dyn,"is_in_nested") and dyn.is_in_nested
 
-def map_reduce(input_seq,mapper=identity,nested=None,reducer=list,input_files=None, output_files=None,name=None,runner=None):
+def map_reduce(input_seq,mapper=identity,reducer=list,input_files=None, output_files=None,name=None,runner=None,nested=None):
     #!!! need docs
     if runner is None and nested is None and not is_in_nested():
         result = reducer(apply(mapper,[x]) for x in input_seq)

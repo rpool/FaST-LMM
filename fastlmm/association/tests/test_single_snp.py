@@ -418,13 +418,12 @@ class TestSingleSnpLeaveOutOneChrom(unittest.TestCase):
 
     def test_covar_by_chrom(self):
             logging.info("TestSingleSnpLeaveOutOneChrom test_covar_by_chrom")
-            from pysnptools.snpreader import Bed
+            from pysnptools.snpreader import Bed, Pheno, SnpData
             test_snps = Bed(self.bedbase)
             pheno = self.phen_fn
-            covar = self.cov_fn
-            covar_by_chrom = {}
-            for chrom in xrange(1,6):
-                covar_by_chrom[chrom] = covar
+            covar = Pheno(self.cov_fn).read()
+            covar = SnpData(iid=covar.iid,sid=["pheno-1"],val=covar.val)
+            covar_by_chrom = {chrom:self.cov_fn for chrom in xrange(1,6)}
             output_file = self.file_name("covar_by_chrom")
             frame = single_snp_leave_out_one_chrom(test_snps, pheno,
                                       covar=covar, mixing=0,
@@ -436,13 +435,13 @@ class TestSingleSnpLeaveOutOneChrom(unittest.TestCase):
 
     def test_covar_by_chrom_mixing(self):
             logging.info("TestSingleSnpLeaveOutOneChrom test_covar_by_chrom_mixing")
-            from pysnptools.snpreader import Bed
+            from pysnptools.snpreader import Bed, Pheno, SnpData
             test_snps = Bed(self.bedbase)
             pheno = self.phen_fn
             covar = self.cov_fn
-            covar_by_chrom = {}
-            for chrom in xrange(1,6):
-                covar_by_chrom[chrom] = covar
+            covar = Pheno(self.cov_fn).read()
+            covar = SnpData(iid=covar.iid,sid=["pheno-1"],val=covar.val)
+            covar_by_chrom = {chrom:self.cov_fn for chrom in xrange(1,6)}
             output_file = self.file_name("covar_by_chrom_mixing")
             frame = single_snp_leave_out_one_chrom(test_snps, pheno,
                                       covar=covar,
@@ -487,7 +486,7 @@ if __name__ == '__main__':
     suites = unittest.TestSuite([getTestSuite()])
 
     if True: #Standard test run #!!!cmk
-        r = unittest.TextTestRunner(failfast=False)
+        r = unittest.TextTestRunner(failfast=True) #!!!cmk
         r.run(suites)
     else: #Cluster test run
         logging.basicConfig(level=logging.INFO)
