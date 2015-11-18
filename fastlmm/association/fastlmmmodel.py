@@ -41,7 +41,7 @@ def _pheno_fixup(pheno_input, iid_if_none=None, missing ='-9'):
 
     return pheno_input
 
-def _kernel_fixup(input, iid_if_none, standardizer, test=None, test_iid_if_none=None):
+def _kernel_fixup(input, iid_if_none, standardizer, test=None, test_iid_if_none=None, block_size=None):
     if test is not None and input is None:
         input = test
         test = None
@@ -55,7 +55,7 @@ def _kernel_fixup(input, iid_if_none, standardizer, test=None, test_iid_if_none=
         test = Bed(test)
 
     if isinstance(input,SnpReader):
-        return SnpKernel(input,standardizer=standardizer,test=test)
+        return SnpKernel(input,standardizer=standardizer,test=test,block_size=block_size)
 
     if input is None:
         return KernelIdentity(iid=iid_if_none,test=test_iid_if_none)
