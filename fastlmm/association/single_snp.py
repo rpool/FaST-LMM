@@ -141,7 +141,7 @@ def single_snp_leave_out_one_chrom(test_snps, pheno,
                  K1=None, mixing=None, #!!!cmk c update comments, etc for G0->G0_or_K0
                  covar=None,covar_by_chrom=None,
                  output_file_name=None, h2=None, log_delta=None,
-                 cache_pattern = None, G0=None, G1=None, force_full_rank=False, force_low_rank=False, batch_size1=None, batch_size2=None, interact_with_snp=None, runner1=None, runner2=None):
+                 cache_pattern = None, G0=None, G1=None, force_full_rank=False, force_low_rank=False, batch_size=None, interact_with_snp=None, runner1=None, runner2=None):
     """
     Function performing single SNP GWAS via cross validation over the chromosomes with REML
 
@@ -221,11 +221,11 @@ def single_snp_leave_out_one_chrom(test_snps, pheno,
     chrom_to_cache_file = {chrom:(None if cache_pattern is None else cache_pattern.format(chrom)) for chrom in chrom_list}
 
     def files_for_chrom(chrom):
-        logging.info("Working on chrom {0}".format(chrom))
         cache_file_chrom = chrom_to_cache_file[chrom]
-        K0_chrom = _K_per_chrom(K0 or G0 or test_snps, chrom, test_snps.iid,block_size=batch_size1) #!!!cmk why is it called "batch_size" in some places and "block_size" in others.
-        K1_chrom = _K_per_chrom(K1 or G1, chrom, test_snps.iid,block_size=batch_size1)
+        K0_chrom = _K_per_chrom(K0 or G0 or test_snps, chrom, test_snps.iid,block_size=batch_size) #!!!cmk why is it called "batch_size" in some places and "block_size" in others.
+        K1_chrom = _K_per_chrom(K1 or G1, chrom, test_snps.iid,block_size=batch_size)
         test_snps_chrom = test_snps[:,test_snps.pos[:,0]==chrom]
+        logging.info("Working on chrom {0} with test_snps divided by {1}".format(chrom, float(test_snps_chrom.sid_count)/batch_size))
         covar_chrom = _create_covar_chrom(covar, covar_by_chrom, chrom)
         K0_chrom, K1_chrom, test_snps_chrom, pheno_chrom, covar_chrom  = pstutil.intersect_apply([K0_chrom, K1_chrom, test_snps_chrom, pheno, covar_chrom])
         logging.debug("# of iids now {0}".format(K0_chrom.iid_count))
@@ -239,7 +239,7 @@ def single_snp_leave_out_one_chrom(test_snps, pheno,
                                     covar=covar_chrom, K1_standardized=K1_chrom,
                                     mixing=mixing, h2=h2, log_delta=log_delta,
                                     cache_file = cache_file_chrom, force_full_rank=force_full_rank,force_low_rank=force_low_rank,
-                                    output_file_name=None, batch_size=batch_size1, interact_with_snp=interact_with_snp) #!!!cmk should output_file_name be set here optionally?
+                                    output_file_name=None, batch_size=batch_size, interact_with_snp=interact_with_snp) #!!!cmk should output_file_name be set here optionally?
 
         return chrom, cache_file_chrom
 
@@ -261,7 +261,7 @@ def single_snp_leave_out_one_chrom(test_snps, pheno,
                                     covar=covar_chrom, K1_standardized=K1_chrom,
                                     mixing=mixing, h2=h2, log_delta=log_delta,
                                     cache_file = cache_file_chrom, force_full_rank=force_full_rank,force_low_rank=force_low_rank,
-                                    output_file_name=None, batch_size=batch_size2, interact_with_snp=interact_with_snp) #!!!cmk should output_file_name be set here optionally?
+                                    output_file_name=None, batch_size=batch_size, interact_with_snp=interact_with_snp) #!!!cmk should output_file_name be set here optionally?
             
         return distributable
 

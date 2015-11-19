@@ -36,7 +36,7 @@ class LocalInParts: # implements IRunner
             return run_one_task(distributable, self.taskindex, self.taskcount, tempdir)
         else:
             result = run_one_task(distributable, self.taskindex, self.taskcount, tempdir)
-            JustCheckExists().output(distributable)
+            #!!!cmk don't need or want this, right? JustCheckExists().output(distributable)
 
             if self.result_file is not None:
                 util.create_directory_if_necessary(self.result_file)

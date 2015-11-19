@@ -116,7 +116,7 @@ class LMM(object):
 					self.S = self.S[inonzero]
 					self.S = self.S * self.S
 					self.U = self.U[:,inonzero]
-                
+					
 				except la.LinAlgError:  # revert to Eigenvalue decomposition
 					print "Got SVD exception, trying eigenvalue decomposition of square of G. Note that this is a little bit less accurate"
 					[S,V] = la.eigh(PxG.T.dot(PxG))
@@ -223,7 +223,7 @@ class LMM(object):
 				self.G = G
 			else:
 				self.G = G.copy()
-        
+	
 
 	def clear_cache(self, reset_K=True):
 		"""
@@ -313,7 +313,7 @@ class LMM(object):
 		if self.Y.shape[1] > 1:
 			print "not implemented"
 			raise NotImplementedError("only single pheno case implemented")
-        
+		
 		self.numcalls = 0
 		resmin = [None]
 		def f(x,resmin=resmin, **kwargs):
@@ -321,7 +321,7 @@ class LMM(object):
 			t0 = time.time()
 			h2_1 = (1.0 - h2) * x
 			res = self.nLLeval_2K(h2_1=h2_1, i_up=i_up, i_G1=i_G1, UW=UW, UUW=UUW, h2=h2, **kwargs)
-            
+			
 			if (resmin[0] is None) or (res['nLL'] < resmin[0]['nLL']):
 				resmin[0] = res
 			t1 = time.time()
@@ -376,7 +376,7 @@ class LMM(object):
 			return res['nLL']
 		min = minimize1D(f=f, nGrid=nGridH2, minval=minH2, maxval=maxH2)
 		return resmin[0]
-        
+		
 	def find_log_delta(self, sid_count=1, min_log_delta=-5, max_log_delta=10, nGrid=10, **kwargs):
 		'''
 		perform search for optimal log delta (single kernel case)
@@ -565,7 +565,7 @@ class LMM(object):
 		#
 		#if (UUY is not None):#low rank part
 		#    logdetK+=(N-k) * np.log(denom)
-        
+		
 		if UW is not None:
 			weightW = np.zeros(UW.shape[1])
 			weightW[i_up] = -h2
@@ -575,12 +575,12 @@ class LMM(object):
 
 		Usnps,UUsnps = None,None
 		if snps is not None:
-            
+			
 			if snps.shape[0] != self.Y.shape[0]:
 				#pdb.set_trace()
 				print "shape mismatch between snps and Y"
 			Usnps,UUsnps = self.rotate(A=snps)
-                
+		
 		result = self.nLLcore(Sd=Sd, dof=dof, scale=scale, penalty=penalty, UW=UW, UUW=UUW, weightW=weightW, denom=denom, Usnps=Usnps, UUsnps=UUsnps)
 		result['h2'] = h2
 		result['h2_1'] = h2_1
@@ -714,7 +714,7 @@ class LMM(object):
 		'''
 
 		N = self.Y.shape[0] - self.linreg.D
-        
+		
 		S,U = self.getSU()#not used, as provided from outside. Remove???
 		k = S.shape[0]
 		assert Sd.shape[0] == k, "shape missmatch"
@@ -726,12 +726,12 @@ class LMM(object):
 
 		if (UUY is not None):#low rank part
 			logdetK+=(N - k) * np.log(denom)
-        
+		
 		if Usnps is not None:
-            
+			
 			snpsKsnps = computeAKA(Sd=Sd, denom=denom, UA=Usnps, UUA=UUsnps)[:,np.newaxis]
 			snpsKY = computeAKB(Sd=Sd, denom=denom, UA=Usnps, UB=UY, UUA=UUsnps, UUB=UUY)
-        
+		
 		if weightW is not None:
 			absw = np.absolute(weightW)
 			weightW_nonz = absw > 1e-10
@@ -757,7 +757,7 @@ class LMM(object):
 			if multsign:
 				UUW_ = UUW * signw[np.newaxis,:]
 			num_exclude = UW.shape[1]
-            
+			
 
 			#WW = np.diag(1.0/weightW) + computeAKB(Sd=Sd, denom=denom, UA=UW, UUA=UUW,
 			#UB=UW, UUB=UUW)
@@ -765,11 +765,11 @@ class LMM(object):
 				WW = np.eye(num_exclude) + computeAKB(Sd=Sd, denom=denom, UA=UW, UUA=UUW, UB=UW_, UUB=UUW_)
 			else:
 				WW = np.diag(signw) + computeAKB(Sd=Sd, denom=denom, UA=UW, UUA=UUW, UB=UW, UUB=UUW)
-            
+			
 			# compute inverse efficiently
 			[S_WW,U_WW] = la.eigh(WW)
 			# compute S_WW^{-1} * UWX
-                        
+			
 			WY = computeAKB(Sd=Sd, denom=denom, UA=UW, UUA=UUW, UB=UY, UUB=UUY)
 			UWY = U_WW.T.dot(WY)
 			WY = UWY / np.lib.stride_tricks.as_strided(S_WW, (S_WW.size,UWY.shape[1]), (S_WW.itemsize,0))
@@ -778,7 +778,7 @@ class LMM(object):
 			# perform updates (instantiations for a and b in Equation (1.5) of
 			# Supplement)
 			YKY -= (UWY * WY).sum(0)
-            
+			
 			if Usnps is not None:
 				Wsnps = computeAKB(Sd=Sd, denom=denom, UA=UW, UUA=UUW, UB=Usnps, UUB=UUsnps)
 				UWsnps = U_WW.T.dot(Wsnps)
@@ -788,13 +788,13 @@ class LMM(object):
 				# perform updates (instantiations for a and b in Equation (1.5) of
 				# Supplement)
 				snpsKsnps -= (UWsnps * Wsnps).sum(0)[:,np.newaxis]
-            
+			
 			# determinant update
 			prod_diags = signw * S_WW
 			if np.mod((prod_diags < 0).sum(),2):
 				raise FloatingPointError("nan log determinant")
 			logdetK += np.log(np.absolute(S_WW)).sum()
-            
+			
 			########
 
 		if Usnps is not None:
@@ -805,21 +805,21 @@ class LMM(object):
 			    logging.warning("NaN beta value seen, may be due to an SNC (a constant SNP)")
 			    beta[snpsKY==0] = 0.0
 			variance_explained_beta = (snpsKY * beta)
-                        r2 = YKY[np.newaxis,:] - variance_explained_beta 
+			r2 = YKY[np.newaxis,:] - variance_explained_beta 
 			if penalty:
 				variance_beta = r2 / (N - 1) * (snpsKsnps / ((snpsKsnps + penalty_) * (snpsKsnps + penalty_)))#note that we assume the loss in DOF is 1 here, even though it is less, so the
-                                #variance estimate is conservative, due to N-1 for penalty case
-                                variance_explained_beta *= (snpsKsnps/(snpsKsnps+penalty_)) * (snpsKsnps/(snpsKsnps + penalty_))
-                        else:
-                                variance_beta = r2 / (N - 1) / snpsKsnps
-                        fraction_variance_explained_beta = variance_explained_beta / YKY[np.newaxis,:] # variance explained by beta over total variance
-                        
+				#variance estimate is conservative, due to N-1 for penalty case
+				variance_explained_beta *= (snpsKsnps/(snpsKsnps+penalty_)) * (snpsKsnps/(snpsKsnps + penalty_))
+			else:
+				variance_beta = r2 / (N - 1) / snpsKsnps
+				fraction_variance_explained_beta = variance_explained_beta / YKY[np.newaxis,:] # variance explained by beta over total variance
+		
 		else:
 			r2 = YKY
 			beta = None
 			variance_beta = None
-                        variance_explained_beta = None
-                        fraction_variance_explained_beta = None
+			variance_explained_beta = None
+			fraction_variance_explained_beta = None
 
 		if dof is None:#Use the Multivariate Gaussian
 			sigma2 = r2 / N
@@ -898,11 +898,25 @@ def computeAKA(Sd, denom, UA, UUA=None):
     
 	A.T.dot( f(K) ).dot(A)
 	"""
-	UAS = UA / np.lib.stride_tricks.as_strided(Sd, (Sd.size,UA.shape[1]), (Sd.itemsize,0))
-	AKA = (UAS * UA).sum(0)
-	if UUA is not None:
-		AKA += (UUA * UUA).sum(0) / denom
+	#To save memory divide the work into 10 pieces
+	piece_count = 10 if UA.shape[0] > 10 and UA.shape[1] > 1 else 1
+
+	AKA = np.zeros(UA.shape[1])
+	start0, start1 = 0, 0
+	for piece_index in xrange(piece_count):
+		end0 = UA.shape[0] * (piece_index+1) // piece_count
+		AKA += (UA[start0:end0,:] / Sd.reshape(-1,1)[start0:end0,:] * UA[start0:end0,:]).sum(0)
+		start0 = end0
+		if UUA is not None:
+		    end1 = UUA.shape[0] * (piece_index+1) // piece_count
+		    AKA += (UUA[start1:end1,:] * UUA[start1:end1,:]).sum(0) / denom
+		    start1 = end1
 	return AKA
+
+#def _elementwise_mult_and_sum(a,b,start,end):
+#    s =  (a[start:end,:] * b[start:end,:]).sum(0)
+#    return s
+
 
 if 0:
     import scipy as sp
