@@ -141,7 +141,7 @@ def single_snp_leave_out_one_chrom(test_snps, pheno,
                  K1=None, mixing=None, #!!!cmk c update comments, etc for G0->G0_or_K0
                  covar=None,covar_by_chrom=None,
                  output_file_name=None, h2=None, log_delta=None,
-                 cache_pattern = None, G0=None, G1=None, force_full_rank=False, force_low_rank=False, batch_size=None, interact_with_snp=None, runner1=None, runner2=None):
+                 cache_pattern = None, G0=None, G1=None, force_full_rank=False, force_low_rank=False, batch_size=None, interact_with_snp=None, runner=None):
     """
     Function performing single SNP GWAS via cross validation over the chromosomes with REML
 
@@ -201,8 +201,7 @@ def single_snp_leave_out_one_chrom(test_snps, pheno,
     """
     t0 = time.time()
 
-    runner1 = runner1 or runner2 or Local()
-    runner2 = runner2 or runner1 or Local()
+    runner = runner or Local()
 
     assert (K0 is None) or (G0 is None), "Expect at least of one of K0 and G0 to be none"
     assert (K1 is None) or (G1 is None), "Expect at least of one of K1 and G1 to be none"
@@ -217,11 +216,9 @@ def single_snp_leave_out_one_chrom(test_snps, pheno,
     chrom_list = list(set(test_snps.pos[:,0])) # find the set of all chroms mentioned in test_snps, the main testing data
     assert len(chrom_list) > 1, "single_leave_out_one_chrom requires more than one chromosome"
 
-    input_files1 = [test_snps, pheno, K0, K1, covar ,covar_by_chrom, G0, G1]
-    chrom_to_cache_file = {chrom:(None if cache_pattern is None else cache_pattern.format(chrom)) for chrom in chrom_list}
+    input_files = [test_snps, pheno, K0, K1, covar, covar_by_chrom, G0, G1]
 
-    def files_for_chrom(chrom):
-        cache_file_chrom = chrom_to_cache_file[chrom]
+    def nested_closure(chrom):
         K0_chrom = _K_per_chrom(K0 or G0 or test_snps, chrom, test_snps.iid,block_size=batch_size) #!!!cmk why is it called "batch_size" in some places and "block_size" in others.
         K1_chrom = _K_per_chrom(K1 or G1, chrom, test_snps.iid,block_size=batch_size)
         test_snps_chrom = test_snps[:,test_snps.pos[:,0]==chrom]
@@ -229,43 +226,17 @@ def single_snp_leave_out_one_chrom(test_snps, pheno,
         covar_chrom = _create_covar_chrom(covar, covar_by_chrom, chrom)
         K0_chrom, K1_chrom, test_snps_chrom, pheno_chrom, covar_chrom  = pstutil.intersect_apply([K0_chrom, K1_chrom, test_snps_chrom, pheno, covar_chrom])
         logging.debug("# of iids now {0}".format(K0_chrom.iid_count))
-        return K0_chrom, K1_chrom, test_snps_chrom, pheno_chrom, covar_chrom, cache_file_chrom
 
-
-    def nested_closure1(chrom):
-        K0_chrom, K1_chrom, test_snps_chrom, pheno_chrom, covar_chrom, cache_file_chrom = files_for_chrom(chrom)
-
-        _internal_single(cache_and_quit=True, K0_standardized=K0_chrom, test_snps=test_snps_chrom, pheno=pheno_chrom,
-                                    covar=covar_chrom, K1_standardized=K1_chrom,
-                                    mixing=mixing, h2=h2, log_delta=log_delta,
-                                    cache_file = cache_file_chrom, force_full_rank=force_full_rank,force_low_rank=force_low_rank,
-                                    output_file_name=None, batch_size=batch_size, interact_with_snp=interact_with_snp) #!!!cmk should output_file_name be set here optionally?
-
-        return chrom, cache_file_chrom
-
-    if cache_pattern is not None:
-        chrom_list_needed = [chrom for chrom in chrom_list if not os.path.exists(chrom_to_cache_file[chrom])]
-        if len(chrom_list_needed) > 0:
-            map_reduce(chrom_list_needed,
-                            mapper=nested_closure1,
-                            reducer=lambda l : {chrom : filename for (chrom, filename) in l},
-                            input_files = input_files1, #!!!cmk covar_by_chrom needs some code, to pull the values from any dictionary
-                            output_files = chrom_to_cache_file.values(),
-                            name = "single_snp_leave_out_one_chrom, part 1, out='{0}'".format(cache_pattern), #!!!cmk test this on output none
-                            runner = runner1)
-
-    def nested_closure2(chrom):
-        K0_chrom, K1_chrom, test_snps_chrom, pheno_chrom, covar_chrom, cache_file_chrom = files_for_chrom(chrom)
-        #!!!cmk doesn't seem like cache_file and output_file_name should not be the same across all chroms
         distributable = _internal_single(K0_standardized=K0_chrom, test_snps=test_snps_chrom, pheno=pheno_chrom,
                                     covar=covar_chrom, K1_standardized=K1_chrom,
-                                    mixing=mixing, h2=h2, log_delta=log_delta,
-                                    cache_file = cache_file_chrom, force_full_rank=force_full_rank,force_low_rank=force_low_rank,
-                                    output_file_name=None, batch_size=batch_size, interact_with_snp=interact_with_snp) #!!!cmk should output_file_name be set here optionally?
+                                    mixing=mixing, h2=h2, log_delta=log_delta, cache_file=None,
+                                    force_full_rank=force_full_rank,force_low_rank=force_low_rank,
+                                    output_file_name=None, batch_size=batch_size, interact_with_snp=interact_with_snp,
+                                    runner=Local()) #!!!cmk should output_file_name be set here optionally?
             
         return distributable
 
-    def reducer_closure2(frame_sequence):
+    def reducer_closure(frame_sequence):
         frame = pd.concat(frame_sequence)
         frame.sort_values(by="PValue", inplace=True)
         frame.index = np.arange(len(frame))
@@ -278,14 +249,13 @@ def single_snp_leave_out_one_chrom(test_snps, pheno,
 
         return frame
 
-    input_files2 = input_files1+chrom_to_cache_file.values()
     frame = map_reduce(chrom_list,
-               nested = nested_closure2,
-               reducer = reducer_closure2, ###!!!cmk rename input_files and output_files to inputs and outputs
-               input_files = input_files2, #!!!cmk covar_by_chrom needs some code, to pull the values from any dictionary
+               mapper = nested_closure,
+               reducer = reducer_closure, ###!!!cmk rename input_files and output_files to inputs and outputs
+               input_files = input_files, #!!!cmk covar_by_chrom needs some code, to pull the values from any dictionary
                output_files = [output_file_name],
-               name = "single_snp_leave_out_one_chrom, part 2, out='{0}'".format(output_file_name), #!!!cmk test this on output none
-               runner = runner2)
+               name = "single_snp_leave_out_one_chrom, out='{0}'".format(output_file_name), #!!!cmk test this on output none
+               runner = runner)
 
     return frame
 
@@ -388,12 +358,10 @@ def _internal_single(K0_standardized, test_snps, pheno, covar, K1_standardized,
                  mixing, #!!test mixing and G1
                  h2, log_delta,
                  cache_file, force_full_rank,force_low_rank,
-                 output_file_name, batch_size, interact_with_snp, cache_and_quit=False, runner=None):
+                 output_file_name, batch_size, interact_with_snp, runner):
     assert mixing is None or 0.0 <= mixing <= 1.0
     if force_full_rank and force_low_rank:
         raise Exception("Can't force both full rank and low rank")
-    if cache_and_quit:
-        assert cache_file is not None, "if 'cache_and_quit' option is given, 'cache_file' must be given, too"
 
     assert h2 is None or log_delta is None, "if h2 is specified, log_delta may not be specified"
     if log_delta is not None:
@@ -436,9 +404,6 @@ def _internal_single(K0_standardized, test_snps, pheno, covar, K1_standardized,
             pstutil.create_directory_if_necessary(cache_file)
             lmm.getSU()
             np.savez(cache_file, lmm.U,lmm.S,np.array([h2,mixing])) #using np.savez instead of pickle because it seems to be faster to read and write
-
-    if cache_and_quit:
-        return
 
     if interact_with_snp is not None:
         logging.info("interaction with %i" % interact_with_snp)
