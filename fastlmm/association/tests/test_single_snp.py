@@ -271,14 +271,6 @@ class TestSingleSnp(unittest.TestCase):
                                       )
         self.compare_files(frame,"G1")
 
-        frame2 = single_snp(test_snps=test_snps[:,:10], pheno=pheno,G0=None, 
-                                      covar=covar, G1=None,
-                                      mixing=.5,
-                                      output_file_name=output_file_name,
-                                      cache_file = cache_file
-                                      )
-        self.compare_files(frame2,"G1")
-
 
     def test_G1_mixing(self):
         logging.info("TestSingleSnp test_G1_mixing")
@@ -383,29 +375,6 @@ class TestSingleSnpLeaveOutOneChrom(unittest.TestCase):
                                   )
 
         self.compare_files(frame,"one_looc")
-
-    def test_looc_w_cache(self):
-        logging.info("TestSingleSnpLeaveOutOneChrom test_looc_w_cache")
-        test_snps = Bed(self.bedbase)
-        pheno = self.phen_fn
-        covar = self.cov_fn
-
-        import glob
-        cache_pattern =  self.file_name("test_w_cache.cache.{0}.npz")[:-4]
-        for cache_fn in glob.glob(cache_pattern.format('*')):
-            os.remove(cache_fn)
-        frame = single_snp_leave_out_one_chrom(test_snps, pheno,
-                                  covar=covar, mixing=0,
-                                  cache_pattern=cache_pattern,
-                                  )
-
-        self.compare_files(frame,"one_looc")
-        frame2 = single_snp_leave_out_one_chrom(test_snps, pheno,
-                                  covar=covar, mixing=0,
-                                  cache_pattern=cache_pattern,
-                                  )
-
-        self.compare_files(frame2,"one_looc")
 
     def test_interact_looc(self):
         logging.info("TestSingleSnpLeaveOutOneChrom test_interact_looc")

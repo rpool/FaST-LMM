@@ -141,14 +141,16 @@ class LMM(object):
 		get the spectral decomposition of the kernel matrix. Computes it if needed.
 		"""
 		if self.U is None or self.S is None:
-			logging.info("starting 'lmm_cov.getSU()'")
 			if self.K is not None:
+				logging.info("starting 'lmm_cov.setSU_fromK()'")
 				self.setSU_fromK()
+				logging.info("finished 'lmm_cov.setSU_fromK()'")
 			elif self.G is not None:
+				logging.info("starting 'lmm_cov.setSU_fromG()'")
 				self.setSU_fromG()
+				logging.info("finished 'lmm_cov.setSU_fromG()'")
 			else:
 				raise Exception("No Kernel is set. Cannot return U and S.") 
-			logging.info("finished 'lmm_cov.getSU()'")
 		return self.S, self.U
 
 	def rotate(self, A):

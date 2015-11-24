@@ -24,15 +24,16 @@ from pysnptools.kernelreader import KernelNpz
 from fastlmm.util.mapreduce import map_reduce
 from pysnptools.util import create_directory_if_necessary
 from pysnptools.snpreader import wrap_matrix_subset #!!!cmk why does this need to be here for cluster to work
+from pysnptools.util.intrangeset import IntRangeSet
+from fastlmm.association.fastlmmmodel import _snps_fixup, _pheno_fixup, _kernel_fixup
             
 
 
 #!!!cmk test that it works with two identity matrices -- even if it doesn't do linearregression shortcut
-def single_snp(test_snps, pheno,
-                 K0=None,
+def single_snp(test_snps, pheno, K0=None,
                  K1=None, mixing=None, #!!!cmk c update comments, etc for G0->G0_or_K0
                  covar=None, output_file_name=None, h2=None, log_delta=None,
-                 cache_file = None, G0=None, G1=None, force_full_rank=False, force_low_rank=False, batch_size=None, interact_with_snp=None, runner=None):
+                 cache_file = None, G0=None, G1=None, force_full_rank=False, force_low_rank=False, GB_goal=None, interact_with_snp=None, runner=None):
     """
     #!!!cmk document batch_size, etc
     Function performing single SNP GWAS with REML
@@ -102,24 +103,19 @@ def single_snp(test_snps, pheno,
 
     """
     t0 = time.time()
-
-    if runner is None:
-        runner = Local()
+    runner = runner or Local()
     if force_full_rank and force_low_rank:
         raise Exception("Can't force both full rank and low rank")
 
-    from fastlmm.association.fastlmmmodel import _snps_fixup, _pheno_fixup, _kernel_fixup
-    test_snps = _snps_fixup(test_snps)
-    pheno = _pheno_fixup(pheno).read()
-    assert pheno.sid_count == 1, "Expect pheno to be just one variable"
-    pheno = pheno[(pheno.val==pheno.val)[:,0],:] #!!!cmk is this a good idea?: remove NaN's from pheno before intersections (this means that the inputs will be standardized according to this pheno)
+    test_snps, pheno, covar = fixup_three(test_snps, pheno, covar)
 
-    covar = _pheno_fixup(covar, iid_if_none=pheno.iid)
-    K0 = _kernel_fixup(K0 or G0, iid_if_none=test_snps.iid, standardizer=Unit()) #!!!cmk document that will use test_snps if K0 (and G0) are not given
+    K0 = _kernel_fixup(K0 or G0 or test_snps, iid_if_none=test_snps.iid, standardizer=Unit()) #!!!cmk document that will use test_snps if K0 (and G0) are not given
     K1 = _kernel_fixup(K1 or G1, iid_if_none=test_snps.iid, standardizer=Unit())
 
     K0, K1, test_snps, pheno, covar  = pstutil.intersect_apply([K0, K1, test_snps, pheno, covar]) #!!!cmk fix up util's intersect_apply and then use it instead
     logging.debug("# of iids now {0}".format(K0.iid_count))
+
+    batch_size = determine_batch_size(test_snps,K0,K1,GB_goal,force_full_rank,force_low_rank) #Can change, in place, the batch_size of the K0 and K1 readers
 
     frame =  _internal_single(K0_standardized=K0, test_snps=test_snps, pheno=pheno,
                                 covar=covar, K1_standardized=K1,
@@ -128,20 +124,74 @@ def single_snp(test_snps, pheno,
                                 output_file_name=output_file_name,batch_size=batch_size, interact_with_snp=interact_with_snp,
                                 runner=runner)
 
-    from pysnptools.util.intrangeset import IntRangeSet
     sid_index_range = IntRangeSet(frame['sid_index'])
     assert sid_index_range == (0,test_snps.sid_count), "Some SNP rows are missing from the output"
 
     return frame
 
-#!!might one need to pre-compute h2 for each chrom?
-#!!clusterize????
+overhead_gig = .127
+factor = 7.75  # found via trial and error
+
+def fixup_three(test_snps, pheno, covar):
+    assert test_snps is not None, "test_snps must be given as input"
+    test_snps = _snps_fixup(test_snps)
+    pheno = _pheno_fixup(pheno).read()
+    assert pheno.sid_count == 1, "Expect pheno to be just one variable"
+    pheno = pheno[(pheno.val==pheno.val)[:,0],:] #!!!cmk is this a good idea?: remove NaN's from pheno before intersections (this means that the inputs will be standardized according to this pheno)
+    covar = _pheno_fixup(covar, iid_if_none=pheno.iid)
+    return     test_snps, pheno, covar
+
+def determine_batch_size(test_snps,K0,K1,GB_goal,force_full_rank,force_low_rank): #Can change, in place, the batch_size of the K0 and K1 readers
+    min_count = test_snps.iid_count
+    if isinstance(K0,SnpKernel) and isinstance(K1,KernelIdentity) and not force_full_rank:
+        min_count = min(min_count,K0.sid_count)
+    elif isinstance(K1,SnpKernel) and isinstance(K0,KernelIdentity) and not force_full_rank:
+        min_count = min(min_count,K1.sid_count)
+    elif isinstance(K0,SnpKernel) and isinstance(K1,SnpKernel):
+        min_count = min(min_count,K0.sid_count+K1.sid_count)
+    batch_size = _batch_size_from_GB_goal(GB_goal, test_snps.iid_count, min_count)
+    logging.info("Dividing SNPs by {0}".format(test_snps.sid_count/batch_size))
+    #!!!cmk what does force_low_rank do?
+    if isinstance(K0,SnpKernel):
+        K0.batch_size = min(batch_size,K0.sid_count) #!!!cmk document that it's OK to set batch_size late or stop doing it
+    if isinstance(K1,SnpKernel):
+        K1.batch_size = min(batch_size,K1.sid_count)
+    return batch_size
+
+def _GB_goal_from_batch_size(batch_size, iid_count, kernel_gig):
+    left_bytes = batch_size * (iid_count * 8.0 *factor)
+    left_gig = left_bytes / 1024.0**3
+    GB_goal = left_gig + overhead_gig + kernel_gig
+    return GB_goal
+
+def _batch_size_from_GB_goal(GB_goal, iid_count, min_count):
+    kernel_bytes = iid_count * min_count * 8
+    kernel_gig = kernel_bytes / (1024.0**3)
+
+    if GB_goal is None:
+        GB_goal = _GB_goal_from_batch_size(min_count, iid_count, kernel_gig)
+        logging.info("Setting GB_goal to {0} GB".format(GB_goal))
+        return min_count
+
+    left_gig = GB_goal - overhead_gig - kernel_gig
+    if left_gig <= 0:
+        warnings.warn("The full kernel and related operations will likely not fit in the goal_memory")
+    left_bytes = left_gig * 1024.0**3
+    snps_at_once = left_bytes / (iid_count * 8.0 * factor)
+    batch_size = int(snps_at_once)
+
+    if batch_size < min_count:
+        batch_size = min_count
+        GB_goal = _GB_goal_from_batch_size(batch_size, iid_count, kernel_gig)
+        warnings.warn("Can't meet goal_memory without loading too few snps at once. Resetting GB_goal to {0} GB".format(GB_goal))
+
+    return batch_size
+
 def single_snp_leave_out_one_chrom(test_snps, pheno,
-                 K0=None,
-                 K1=None, mixing=None, #!!!cmk c update comments, etc for G0->G0_or_K0
+                 K0=None, K1=None, mixing=None, #!!!cmk c update comments, etc for G0->G0_or_K0
                  covar=None,covar_by_chrom=None,
                  output_file_name=None, h2=None, log_delta=None,
-                 cache_pattern = None, G0=None, G1=None, force_full_rank=False, force_low_rank=False, batch_size=None, interact_with_snp=None, runner=None):
+                 G0=None, G1=None, force_full_rank=False, force_low_rank=False, GB_goal=None, interact_with_snp=None, runner=None):
     """
     Function performing single SNP GWAS via cross validation over the chromosomes with REML
 
@@ -200,39 +250,36 @@ def single_snp_leave_out_one_chrom(test_snps, pheno,
 
     """
     t0 = time.time()
-
     runner = runner or Local()
+    if force_full_rank and force_low_rank:
+        raise Exception("Can't force both full rank and low rank")
 
-    assert (K0 is None) or (G0 is None), "Expect at least of one of K0 and G0 to be none"
-    assert (K1 is None) or (G1 is None), "Expect at least of one of K1 and G1 to be none"
-
-    from fastlmm.association.fastlmmmodel import _snps_fixup, _pheno_fixup, _kernel_fixup
-    test_snps = _snps_fixup(test_snps)
-    pheno = _pheno_fixup(pheno).read()
-    assert pheno.sid_count == 1, "Expect pheno to be just one variable"
-    pheno = pheno[(pheno.val==pheno.val)[:,0],:] #!!!cmk is this a good idea?: remove NaN's from pheno before intersections (this means that the inputs will be standardized according to this pheno)
-    covar = _pheno_fixup(covar, iid_if_none=pheno.iid)
+    test_snps, pheno, covar = fixup_three(test_snps, pheno, covar)
 
     chrom_list = list(set(test_snps.pos[:,0])) # find the set of all chroms mentioned in test_snps, the main testing data
     assert len(chrom_list) > 1, "single_leave_out_one_chrom requires more than one chromosome"
 
-    input_files = [test_snps, pheno, K0, K1, covar, covar_by_chrom, G0, G1]
+    input_files = [test_snps, pheno, K0, G0, K1, G1, covar, covar_by_chrom]
 
     def nested_closure(chrom):
-        K0_chrom = _K_per_chrom(K0 or G0 or test_snps, chrom, test_snps.iid,block_size=batch_size) #!!!cmk why is it called "batch_size" in some places and "block_size" in others.
-        K1_chrom = _K_per_chrom(K1 or G1, chrom, test_snps.iid,block_size=batch_size)
         test_snps_chrom = test_snps[:,test_snps.pos[:,0]==chrom]
-        logging.info("Working on chrom {0} with test_snps divided by {1}".format(chrom, float(test_snps_chrom.sid_count)/batch_size))
         covar_chrom = _create_covar_chrom(covar, covar_by_chrom, chrom)
+
+        #!!!cmk document that will use test_snps if K0 (and G0) are not given
+        K0_chrom = _K_per_chrom(K0 or G0 or test_snps, chrom, test_snps.iid) #!!!cmk why is it called "batch_size" in some places and "block_size" in others.
+        K1_chrom = _K_per_chrom(K1 or G1, chrom, test_snps.iid)
+
         K0_chrom, K1_chrom, test_snps_chrom, pheno_chrom, covar_chrom  = pstutil.intersect_apply([K0_chrom, K1_chrom, test_snps_chrom, pheno, covar_chrom])
         logging.debug("# of iids now {0}".format(K0_chrom.iid_count))
+
+        batch_size = determine_batch_size(test_snps_chrom,K0_chrom,K1_chrom,GB_goal,force_full_rank,force_low_rank) #Can change, in place, the batch_size of the K0 and K1 readers
 
         distributable = _internal_single(K0_standardized=K0_chrom, test_snps=test_snps_chrom, pheno=pheno_chrom,
                                     covar=covar_chrom, K1_standardized=K1_chrom,
                                     mixing=mixing, h2=h2, log_delta=log_delta, cache_file=None,
                                     force_full_rank=force_full_rank,force_low_rank=force_low_rank,
                                     output_file_name=None, batch_size=batch_size, interact_with_snp=interact_with_snp,
-                                    runner=Local()) #!!!cmk should output_file_name be set here optionally?
+                                    runner=Local())
             
         return distributable
 
@@ -259,23 +306,19 @@ def single_snp_leave_out_one_chrom(test_snps, pheno,
 
     return frame
 
-def _K_per_chrom(K, chrom, iid, block_size): #!!!cmk is does regular single_snp use 'block_size'?
-    from fastlmm.association.fastlmmmodel import _snps_fixup, _pheno_fixup, _kernel_fixup
-
-    if isinstance(K,dict):
-        K = _kernel_fixup(K[chrom], iid_if_none=iid, standardizer=Unit())
-    elif K is None:
-        return None
+def _K_per_chrom(K, chrom, iid):
+    if K is None:
+        return KernelIdentity(iid)
     else:
-        K_all = _kernel_fixup(K, iid_if_none=iid, standardizer=Unit(),block_size=block_size) #!!!move this out of loop !!!cmk
+        K_all = _kernel_fixup(K, iid_if_none=iid, standardizer=Unit()) #!!!move this out of loop !!!cmk
         if isinstance(K_all,SnpKernel):
-            return SnpKernel(K_all.snpreader[:,K_all.pos[:,0] != chrom],Unit(),block_size=block_size)
+            return SnpKernel(K_all.snpreader[:,K_all.pos[:,0] != chrom],Unit())
         else:
             raise Exception("Don't know how to make '{0}' work per chrom".format(K_all))
 
 #!!!cmk figureout when read's and read(view_ok=True) should be used
 #!!!cmk add code to test force_full_rank=False, force_low_rank=False
-def _combine_the_best_way(K0_standardized,K1_standardized,covar,y,mixing,h2,force_full_rank=False, force_low_rank=False):
+def _combine_the_best_way(K0_standardized,K1_standardized,covar,y,mixing,h2,force_full_rank=False, force_low_rank=False): #!!!cmk "K0_standardized" is misnomer, right?
     if force_full_rank and force_low_rank:
         raise Exception("Can't force both full rank and low rank")
 
@@ -359,6 +402,8 @@ def _internal_single(K0_standardized, test_snps, pheno, covar, K1_standardized,
                  h2, log_delta,
                  cache_file, force_full_rank,force_low_rank,
                  output_file_name, batch_size, interact_with_snp, runner):
+    assert K0_standardized is not None, "real assert"
+    assert K1_standardized is not None, "real assert"
     assert mixing is None or 0.0 <= mixing <= 1.0
     if force_full_rank and force_low_rank:
         raise Exception("Can't force both full rank and low rank")
@@ -415,7 +460,7 @@ def _internal_single(K0_standardized, test_snps, pheno, covar, K1_standardized,
         interact = None
 
     if batch_size is None:
-       batch_size = test_snps.sid_count #!!!cmk what's the point in having an inner loop is everything is done in one match?
+       batch_size = test_snps.sid_count #!!!cmk what's the point in having an inner loop is everything is done in one batch?
     work_count = -(test_snps.sid_count // -batch_size) #Find the work count based on batch size (rounding up)
 
     # We define three closures, that is, functions define inside function so that the inner function has access to the local variables of the outer function.
@@ -483,7 +528,6 @@ def _internal_single(K0_standardized, test_snps, pheno, covar, K1_standardized,
 
 
 def _create_covar_chrom(covar, covar_by_chrom, chrom):
-    from fastlmm.association.fastlmmmodel import _snps_fixup, _pheno_fixup, _kernel_fixup
     if covar_by_chrom is not None:
         covar_by_chrom_chrom = covar_by_chrom[chrom]
         covar_by_chrom_chrom = _pheno_fixup(covar_by_chrom_chrom, iid_if_none=covar)

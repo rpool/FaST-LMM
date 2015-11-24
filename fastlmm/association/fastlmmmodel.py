@@ -2,15 +2,15 @@ import numpy as np
 import logging
 import unittest
 import os
-from fastlmm.feature_selection import FeatureSelectionStrategy, load_snp_data
+#from fastlmm.feature_selection import FeatureSelectionStrategy, load_snp_data
 from pysnptools.snpreader import Bed,Pheno
 from pysnptools.kernelreader import SnpKernel
 from pysnptools.kernelreader import Identity as KernelIdentity
 import pysnptools.util as pstutil
-from fastlmm.feature_selection.feature_selection_two_kernel import FeatureSelectionInSample
-from fastlmm.association import single_snp
-from pysnptools.standardizer import DiagKtoN,UnitTrained
-from fastlmm.inference.lmm import LMM
+#from fastlmm.feature_selection.feature_selection_two_kernel import FeatureSelectionInSample
+#from fastlmm.association import single_snp
+#from pysnptools.standardizer import DiagKtoN,UnitTrained
+#from fastlmm.inference.lmm import LMM
 from pysnptools.util import intersect_apply
 from pysnptools.snpreader import SnpData,SnpReader
 from pysnptools.standardizer import Unit
@@ -50,9 +50,9 @@ def _kernel_fixup(input, iid_if_none, standardizer, test=None, test_iid_if_none=
         return KernelNpz(input)
 
     if isinstance(input, str):
-        input = Bed(input)
+        input = Bed(input)     #Note that we don't return here. Processing continues
     if isinstance(test, str):
-        test = Bed(test)
+        test = Bed(test)      #Note that we don't return here. Processing continues
 
     if isinstance(input,SnpReader):
         return SnpKernel(input,standardizer=standardizer,test=test,block_size=block_size)
