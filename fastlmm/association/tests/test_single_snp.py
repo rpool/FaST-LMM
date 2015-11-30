@@ -46,17 +46,18 @@ class TestSingleSnp(unittest.TestCase):
         test_sid = ["snp26250_m0_.19m1_.19","snp63751_m0_.23m1_.23","snp82500_m0_.28m1_.28","snp48753_m0_.4m1_.4","snp45001_m0_.26m1_.26","snp52500_m0_.05m1_.05","snp75002_m0_.39m1_.39","snp41253_m0_.07m1_.07","snp86250_m0_.33m1_.33","snp15002_m0_.11m1_.11","snp33752_m0_.31m1_.31","snp26252_m0_.19m1_.19","snp30001_m0_.28m1_.28","snp11253_m0_.2m1_.2","snp67501_m0_.15m1_.15","snp3753_m0_.23m1_.23","snp52502_m0_.35m1_.35","snp30000_m0_.39m1_.39","snp30002_m0_.25m1_.25"]
         test_idx = snps.sid_to_index(test_sid)
 
-        frame_h2 = single_snp(test_snps=snps[:,test_idx], pheno=pheno, G0=snps[:,sim_idx], covar=covar,h2=.5)
-        frame_log_delta = frame = single_snp(test_snps=snps[:,test_idx], pheno=pheno, G0=snps[:,sim_idx], covar=covar,log_delta=0)
-        for frame in [frame_h2, frame_log_delta]:
-            referenceOutfile = TestFeatureSelection.reference_file("single_snp/topsnps.single.txt")
-            reference = pd.read_table(referenceOutfile,sep="\t") # We've manually remove all comments and blank lines from this file
-            assert len(frame) == len(reference)
-            for _, row in reference.iterrows():
-                sid = row.SNP
-                pvalue = frame[frame['SNP'] == sid].iloc[0].PValue
-                reldiff = abs(row.Pvalue - pvalue)/row.Pvalue
-                assert reldiff < .035, "'{0}' pvalue_list differ too much {4} -- {2} vs {3}".format(sid,None,row.Pvalue,pvalue,reldiff)
+        for G0,G1 in [(snps[:,sim_idx],KernelIdentity(snps.iid)),(KernelIdentity(snps.iid),snps[:,sim_idx])]:
+            frame_h2 = single_snp(test_snps=snps[:,test_idx], pheno=pheno, G0=G0,G1=G1, covar=covar,h2=.5)
+            frame_log_delta = single_snp(test_snps=snps[:,test_idx], pheno=pheno, G0=G0,G1=G1, covar=covar,log_delta=0)
+            for frame in [frame_h2, frame_log_delta]:
+                referenceOutfile = TestFeatureSelection.reference_file("single_snp/topsnps.single.txt")
+                reference = pd.read_table(referenceOutfile,sep="\t") # We've manually remove all comments and blank lines from this file
+                assert len(frame) == len(reference)
+                for _, row in reference.iterrows():
+                    sid = row.SNP
+                    pvalue = frame[frame['SNP'] == sid].iloc[0].PValue
+                    reldiff = abs(row.Pvalue - pvalue)/row.Pvalue
+                    assert reldiff < .035, "'{0}' pvalue_list differ too much {4} -- {2} vs {3}".format(sid,None,row.Pvalue,pvalue,reldiff)
  
     def file_name(self,testcase_name):
         temp_fn = os.path.join(self.tempout_dir,testcase_name+".txt")
@@ -85,8 +86,8 @@ class TestSingleSnp(unittest.TestCase):
         covar = self.cov_fn
 
         output_file_name = self.file_name("mixingKs")
-        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno,K0=SnpKernel(test_snps[:,10:100],Unit()).read(),
-                                      covar=covar, K1=SnpKernel(test_snps[:,100:200],Unit()).read(),mixing=None,
+        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno,K0=SnpKernel(test_snps[:,10:100],Unit()),
+                                      covar=covar, K1=SnpKernel(test_snps[:,100:200],Unit()),mixing=None,
                                       output_file_name=output_file_name
                                       )
 
@@ -117,6 +118,42 @@ class TestSingleSnp(unittest.TestCase):
         output_file = self.file_name("one")
         frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno, mixing=0,
                                   G0=test_snps, covar=covar, 
+                                  output_file_name=output_file
+                                  )
+
+        self.compare_files(frame,"one")
+
+    def test_noK0(self):
+        logging.info("TestSingleSnp test_noK0")
+        test_snps = Bed(self.bedbase)
+        pheno = self.phen_fn
+        covar = self.cov_fn
+
+        output_file = self.file_name("noK0")
+        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno, mixing=1,
+                                  G1=test_snps, covar=covar, 
+                                  output_file_name=output_file
+                                  )
+
+        self.compare_files(frame,"one")
+
+    def test_gb_goal(self):
+        logging.info("TestSingleSnp test_gb_goal")
+        test_snps = Bed(self.bedbase)
+        pheno = self.phen_fn
+        covar = self.cov_fn
+
+        output_file = self.file_name("gb_goal")
+        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno, mixing=0,
+                                  G0=test_snps, covar=covar, GB_goal=0,
+                                  output_file_name=output_file
+                                  )
+
+        self.compare_files(frame,"one")
+
+        output_file = self.file_name("gb_goal2")
+        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno, mixing=0,
+                                  G0=test_snps, covar=covar, GB_goal=.12,
                                   output_file_name=output_file
                                   )
 
@@ -244,13 +281,13 @@ class TestSingleSnp(unittest.TestCase):
         covar = self.cov_fn
 
         output_file_name = self.file_name("G1")
-        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno,G0=test_snps[:,10:100], 
-                                      covar=covar, G1=test_snps[:,100:200],
-                                      mixing=.5,
-                                      output_file_name=output_file_name
-                                      )
-
-        self.compare_files(frame,"G1")
+        for force_full_rank,force_low_rank in [(False,False),(True,False),(False,True)]:
+            frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno,G0=test_snps[:,10:100], 
+                                          covar=covar, G1=test_snps[:,100:200],
+                                          mixing=.5,force_full_rank=force_full_rank,force_low_rank=force_low_rank,
+                                          output_file_name=output_file_name
+                                          )
+            self.compare_files(frame,"G1")
 
 
     def test_file_cache(self):
@@ -263,6 +300,13 @@ class TestSingleSnp(unittest.TestCase):
         cache_file = self.file_name("cache_file")+".npz"
         if os.path.exists(cache_file):
             os.remove(cache_file)
+        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno,G0=test_snps[:,10:100], 
+                                      covar=covar, G1=test_snps[:,100:200],
+                                      mixing=.5,
+                                      output_file_name=output_file_name,
+                                      cache_file = cache_file
+                                      )
+        self.compare_files(frame,"G1")
         frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno,G0=test_snps[:,10:100], 
                                       covar=covar, G1=test_snps[:,100:200],
                                       mixing=.5,
@@ -452,11 +496,14 @@ def getTestSuite():
 
 
 if __name__ == '__main__':
+
+
+
     # this import is needed for the runner
     from fastlmm.association.tests.test_single_snp import TestSingleSnp
     suites = unittest.TestSuite([getTestSuite()])
 
-    if True: #Standard test run #!!!cmk
+    if True: #Standard test run
         r = unittest.TextTestRunner(failfast=True) #!!!cmk
         r.run(suites)
     else: #Cluster test run
@@ -466,9 +513,9 @@ if __name__ == '__main__':
 
 
         runner = HPC(10, 'RR1-N13-09-H44',r'\\msr-arrays\Scratch\msr-pool\Scratch_Storage4\Redmond',
-                     remote_python_parent=r"\\msr-arrays\Scratch\msr-pool\Scratch_Storage4\REDMOND\carlk\Source\carlk\july_7_14\tests\runs\2014-07-24_15_02_02_554725991686\pythonpath",
-                     update_remote_python_parent=True,
-                     priority="AboveNormal",mkl_num_threads=1)
+                        remote_python_parent=r"\\msr-arrays\Scratch\msr-pool\Scratch_Storage4\REDMOND\carlk\Source\carlk\july_7_14\tests\runs\2014-07-24_15_02_02_554725991686\pythonpath",
+                        update_remote_python_parent=True,
+                        priority="AboveNormal",mkl_num_threads=1)
         #runner = Local()
         #runner = LocalMultiProc(taskcount=20,mkl_num_threads=5)
         #runner = LocalInParts(1,2,mkl_num_threads=1) # For debugging the cluster runs

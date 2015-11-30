@@ -23,43 +23,46 @@ from pysnptools.kernelreader import SnpKernel
 from pysnptools.kernelreader import KernelNpz
 from fastlmm.util.mapreduce import map_reduce
 from pysnptools.util import create_directory_if_necessary
-from pysnptools.snpreader import wrap_matrix_subset #!!!cmk why does this need to be here for cluster to work
+from pysnptools.snpreader import wrap_matrix_subset
 from pysnptools.util.intrangeset import IntRangeSet
 from fastlmm.association.fastlmmmodel import _snps_fixup, _pheno_fixup, _kernel_fixup
             
 
-
-#!!!cmk test that it works with two identity matrices -- even if it doesn't do linearregression shortcut
 def single_snp(test_snps, pheno, K0=None,
-                 K1=None, mixing=None, #!!!cmk c update comments, etc for G0->G0_or_K0
+                 K1=None, mixing=None,
                  covar=None, output_file_name=None, h2=None, log_delta=None,
-                 cache_file = None, G0=None, G1=None, force_full_rank=False, force_low_rank=False, GB_goal=None, interact_with_snp=None, runner=None):
+                 cache_file = None, GB_goal=None, interact_with_snp=None, force_full_rank=False, force_low_rank=False, G0=None, G1=None, runner=None):
     """
-    #!!!cmk document batch_size, etc
-    Function performing single SNP GWAS with REML
+    Function performing single SNP GWAS with REML. Will reorder and intersect IIDs as needed.
 
-    :param test_snps: SNPs to test. If you give a string, it should be the base name of a set of PLINK Bed-formatted files.
+    :param test_snps: SNPs to test. Can be any :class:`.SnpReader`. If you give a string, it should be the base name of a set of PLINK Bed-formatted files.
+           (For backwards compatibility can also be dictionary with keys 'vals', 'iid', 'header')
     :type test_snps: a :class:`.SnpReader` or a string
 
-    :param pheno: A single phenotype: A 'pheno dictionary' contains an ndarray on the 'vals' key and a iid list on the 'iid' key.
-      If you give a string, it should be the file name of a PLINK phenotype-formatted file.
-    :type pheno: a 'pheno dictionary' or a string
+    :param pheno: A single phenotype: Can be any :class:`.SnpReader`, for example, :class:`.Pheno` or :class:`.SnpData`.
+           If you give a string, it should be the file name of a PLINK phenotype-formatted file.
+           Any IIDs with missing values will be removed.
+           (For backwards compatibility can also be dictionary with keys 'vals', 'iid', 'header')
+    :type pheno: a :class:`.SnpReader` or a string
 
-    :param G0: SNPs from which to construct a similarity matrix.
-          If you give a string, it should be the base name of a set of PLINK Bed-formatted files.
-    :type G0: a :class:`.SnpReader` or a string
-    #!!!cmk update
-    :param G1: SNPs from which to construct a second similarity kernel, optional. Also, see 'mixing').
-          If you give a string, it should be the base name of a set of PLINK Bed-formatted files.
-    :type G1: a :class:`.SnpReader` or a string
+    :param K0: A similarity matrix. If not given, will use test_snps.
+          If a :class:`.SnpReader` is given, the similarity matrix will be created from the SNP values.
+          If you give a string, it should be the name of a :class:`.KernelNpz` file or base name of a set of PLINK Bed-formatted files.
+    :type K0: a :class:`.KernelReader` or :class:`.SnpReader` or a string
 
-    :param mixing: Weight between 0.0 (inclusive, default) and 1.0 (inclusive) given to G1 relative to G0.
-            If you give no mixing number and a G1 is given, the best weight will be learned.
+    :param K1: A second similarity kernel, optional. (Also, see 'mixing').
+          If a :class:`.SnpReader` is given, the similarity matrix will be created from the SNP values.
+          If you give a string, it should be the name of a :class:`.KernelNpz` file or base name of a set of PLINK Bed-formatted files.
+    :type K1: a :class:`.KernelReader` or :class:`.SnpReader` or a string
+
+    :param mixing: Weight between 0.0 (inclusive, default) and 1.0 (inclusive) given to K1 relative to K0.
+            If you give no mixing number and a K1 is given, the best weight will be learned.
     :type mixing: number
 
-    :param covar: covariate information, optional: A 'pheno dictionary' contains an ndarray on the 'vals' key and a iid list on the 'iid' key.
-      If you give a string, it should be the file name of a PLINK phenotype-formatted file.
-    :type covar: a 'pheno dictionary' or a string
+    :param covar: covariate information, optional: Can be any :class:`.SnpReader`, for example, :class:`.Pheno` or :class:`.SnpData`.
+           If you give a string, it should be the file name of a PLINK phenotype-formatted file.
+           (For backwards compatibility can also be dictionary with keys 'vals', 'iid', 'header')
+    :type covar: a :class:`.SnpReader` or a string
 
     :param output_file_name: Name of file to write results to, optional. If not given, no output file will be created.
     :type output_file_name: file name
@@ -72,19 +75,38 @@ def single_snp(test_snps, pheno, K0=None,
     :param log_delta: a re-parameterization of h2 provided for backwards compatibility.
     :type log_delta: number
 
-
     :param cache_file: Name of  file to read or write cached precomputation values to, optional.
                 If not given, no cache file will be used.
                 If given and file does not exists, will write precomputation values to file.
                 If given and file does exists, will read precomputation values from file.
                 The file contains the U and S matrix from the decomposition of the training matrix. It is in Python's np.savez (*.npz) format.
-                Calls using the same cache file should have the same 'G0' and 'G1'
-                If given and the file does exist then G0 and G1 need not be given.
+                Calls using the same cache file should have the same 'K0' and 'K1'
+                If given and the file does exist then K0 and K1 need not be given.
     :type cache_file: file name
+
+    :param GB_goal: gigabytes of memory the run should use, optional. If not given, will read the test_snps in blocks the same size as the kernel,
+        which is memory efficient with little overhead on computation time.
+    :type GB_goal: number
 
     :param interact_with_snp: index of a covariate to perform an interaction test with. 
             Allows for interaction testing (interact_with_snp x snp will be tested)
             default: None
+
+    :param force_full_rank: Even if kernels are defined with fewer SNPs than IIDs, create an explicit iid_count x iid_count kernel. Cannot be True if force_low_rank is True.
+    :type force_full_rank: Boolean
+
+    :param force_low_rank: Even if kernels are defined with fewer IIDs than SNPs, create a low-rank iid_count x sid_count kernel. Cannot be True if force_full_rank is True.
+    :type force_low_rank: Boolean
+
+    :param G0: Same as K0. Provided for backwards compatibility. Cannot be given if K0 is given.
+    :type G0: a :class:`.KernelReader` or :class:`.SnpReader` or a string
+
+    :param G1: Same as K1. Provided for backwards compatibility. Cannot be given if K1 is given.
+    :type G1: a :class:`.KernelReader` or :class:`.SnpReader` or a string
+
+    :param runner: a runner, optional: Tells how to run locally, multi-processor, or on a cluster.
+        If not given, the function is run locally.
+    :type runner: a runner.
 
     :rtype: Pandas dataframe with one row per test SNP. Columns include "PValue"
 
@@ -97,7 +119,7 @@ def single_snp(test_snps, pheno, K0=None,
     >>> logging.basicConfig(level=logging.INFO)
     >>> snpreader = Bed("../feature_selection/examples/toydata")
     >>> pheno_fn = "../feature_selection/examples/toydata.phe"
-    >>> results_dataframe = single_snp(test_snps=snpreader[:,5000:10000],pheno=pheno_fn,G0=snpreader[:,0:5000],h2=.2,mixing=0)
+    >>> results_dataframe = single_snp(test_snps=snpreader[:,5000:10000],pheno=pheno_fn,K0=snpreader[:,0:5000],h2=.2,mixing=0)
     >>> print results_dataframe.iloc[0].SNP,round(results_dataframe.iloc[0].PValue,7),len(results_dataframe)
     null_7487 3.4e-06 5000
 
@@ -107,21 +129,20 @@ def single_snp(test_snps, pheno, K0=None,
     if force_full_rank and force_low_rank:
         raise Exception("Can't force both full rank and low rank")
 
-    test_snps, pheno, covar = fixup_three(test_snps, pheno, covar)
+    test_snps, pheno, covar = _fixup_three(test_snps, pheno, covar)
 
-    K0 = _kernel_fixup(K0 or G0 or test_snps, iid_if_none=test_snps.iid, standardizer=Unit()) #!!!cmk document that will use test_snps if K0 (and G0) are not given
+    K0 = _kernel_fixup(K0 or G0 or test_snps, iid_if_none=test_snps.iid, standardizer=Unit())
     K1 = _kernel_fixup(K1 or G1, iid_if_none=test_snps.iid, standardizer=Unit())
 
-    K0, K1, test_snps, pheno, covar  = pstutil.intersect_apply([K0, K1, test_snps, pheno, covar]) #!!!cmk fix up util's intersect_apply and then use it instead
+    K0, K1, test_snps, pheno, covar  = pstutil.intersect_apply([K0, K1, test_snps, pheno, covar])
     logging.debug("# of iids now {0}".format(K0.iid_count))
+    K0, K1, block_size = _set_block_size(test_snps, K0, K1, mixing, GB_goal, force_full_rank, force_low_rank)
 
-    batch_size = determine_batch_size(test_snps,K0,K1,GB_goal,force_full_rank,force_low_rank) #Can change, in place, the batch_size of the K0 and K1 readers
-
-    frame =  _internal_single(K0_standardized=K0, test_snps=test_snps, pheno=pheno,
-                                covar=covar, K1_standardized=K1,
+    frame =  _internal_single(K0=K0, test_snps=test_snps, pheno=pheno,
+                                covar=covar, K1=K1,
                                 mixing=mixing, h2=h2, log_delta=log_delta,
                                 cache_file = cache_file, force_full_rank=force_full_rank,force_low_rank=force_low_rank,
-                                output_file_name=output_file_name,batch_size=batch_size, interact_with_snp=interact_with_snp,
+                                output_file_name=output_file_name,block_size=block_size, interact_with_snp=interact_with_snp,
                                 runner=runner)
 
     sid_index_range = IntRangeSet(frame['sid_index'])
@@ -130,46 +151,29 @@ def single_snp(test_snps, pheno, K0=None,
     return frame
 
 overhead_gig = .127
-factor = 7.75  # found via trial and error
+factor = 8.5  # found via trial and error
 
-def fixup_three(test_snps, pheno, covar):
+def _fixup_three(test_snps, pheno, covar):
     assert test_snps is not None, "test_snps must be given as input"
     test_snps = _snps_fixup(test_snps)
     pheno = _pheno_fixup(pheno).read()
     assert pheno.sid_count == 1, "Expect pheno to be just one variable"
-    pheno = pheno[(pheno.val==pheno.val)[:,0],:] #!!!cmk is this a good idea?: remove NaN's from pheno before intersections (this means that the inputs will be standardized according to this pheno)
+    pheno = pheno[(pheno.val==pheno.val)[:,0],:]
     covar = _pheno_fixup(covar, iid_if_none=pheno.iid)
     return     test_snps, pheno, covar
 
-def determine_batch_size(test_snps,K0,K1,GB_goal,force_full_rank,force_low_rank): #Can change, in place, the batch_size of the K0 and K1 readers
-    min_count = test_snps.iid_count
-    if isinstance(K0,SnpKernel) and isinstance(K1,KernelIdentity) and not force_full_rank:
-        min_count = min(min_count,K0.sid_count)
-    elif isinstance(K1,SnpKernel) and isinstance(K0,KernelIdentity) and not force_full_rank:
-        min_count = min(min_count,K1.sid_count)
-    elif isinstance(K0,SnpKernel) and isinstance(K1,SnpKernel):
-        min_count = min(min_count,K0.sid_count+K1.sid_count)
-    batch_size = _batch_size_from_GB_goal(GB_goal, test_snps.iid_count, min_count)
-    logging.info("Dividing SNPs by {0}".format(test_snps.sid_count/batch_size))
-    #!!!cmk what does force_low_rank do?
-    if isinstance(K0,SnpKernel):
-        K0.batch_size = min(batch_size,K0.sid_count) #!!!cmk document that it's OK to set batch_size late or stop doing it
-    if isinstance(K1,SnpKernel):
-        K1.batch_size = min(batch_size,K1.sid_count)
-    return batch_size
-
-def _GB_goal_from_batch_size(batch_size, iid_count, kernel_gig):
-    left_bytes = batch_size * (iid_count * 8.0 *factor)
+def _GB_goal_from_block_size(block_size, iid_count, kernel_gig):
+    left_bytes = block_size * (iid_count * 8.0 *factor)
     left_gig = left_bytes / 1024.0**3
     GB_goal = left_gig + overhead_gig + kernel_gig
     return GB_goal
 
-def _batch_size_from_GB_goal(GB_goal, iid_count, min_count):
+def _block_size_from_GB_goal(GB_goal, iid_count, min_count):
     kernel_bytes = iid_count * min_count * 8
     kernel_gig = kernel_bytes / (1024.0**3)
 
     if GB_goal is None:
-        GB_goal = _GB_goal_from_batch_size(min_count, iid_count, kernel_gig)
+        GB_goal = _GB_goal_from_block_size(min_count, iid_count, kernel_gig)
         logging.info("Setting GB_goal to {0} GB".format(GB_goal))
         return min_count
 
@@ -178,47 +182,49 @@ def _batch_size_from_GB_goal(GB_goal, iid_count, min_count):
         warnings.warn("The full kernel and related operations will likely not fit in the goal_memory")
     left_bytes = left_gig * 1024.0**3
     snps_at_once = left_bytes / (iid_count * 8.0 * factor)
-    batch_size = int(snps_at_once)
+    block_size = int(snps_at_once)
 
-    if batch_size < min_count:
-        batch_size = min_count
-        GB_goal = _GB_goal_from_batch_size(batch_size, iid_count, kernel_gig)
+    if block_size < min_count:
+        block_size = min_count
+        GB_goal = _GB_goal_from_block_size(block_size, iid_count, kernel_gig)
         warnings.warn("Can't meet goal_memory without loading too few snps at once. Resetting GB_goal to {0} GB".format(GB_goal))
 
-    return batch_size
+    return block_size
 
 def single_snp_leave_out_one_chrom(test_snps, pheno,
-                 K0=None, K1=None, mixing=None, #!!!cmk c update comments, etc for G0->G0_or_K0
+                 K0=None, K1=None, mixing=None,
                  covar=None,covar_by_chrom=None,
                  output_file_name=None, h2=None, log_delta=None,
-                 G0=None, G1=None, force_full_rank=False, force_low_rank=False, GB_goal=None, interact_with_snp=None, runner=None):
+                 interact_with_snp=None, force_full_rank=False, force_low_rank=False, GB_goal=None, G0=None, G1=None, runner=None):
     """
-    Function performing single SNP GWAS via cross validation over the chromosomes with REML
+    Function performing single SNP GWAS via cross validation over the chromosomes with REML. Will reorder and intersect IIDs as needed.
 
-    :param test_snps: SNPs to test and to construct similarity matrix.
-          If you give a string, it should be the base name of a set of PLINK Bed-formatted files.
+    :param test_snps: SNPs to test. Can be any :class:`.SnpReader`. If you give a string, it should be the base name of a set of PLINK Bed-formatted files.
+           (For backwards compatibility can also be dictionary with keys 'vals', 'iid', 'header')
     :type test_snps: a :class:`.SnpReader` or a string
 
-    :param pheno: A single phenotype: A 'pheno dictionary' contains an ndarray on the 'vals' key and a iid list on the 'iid' key.
-      If you give a string, it should be the file name of a PLINK phenotype-formatted file.
-    :type pheno: a 'pheno dictionary' or a string
+    :param pheno: A single phenotype: Can be any :class:`.SnpReader`, for example, :class:`.Pheno` or :class:`.SnpData`.
+           If you give a string, it should be the file name of a PLINK phenotype-formatted file.
+           Any IIDs missing values will be removed.
+           (For backwards compatibility can also be dictionary with keys 'vals', 'iid', 'header')
+    :type pheno: a :class:`.SnpReader` or a string
 
-
-    :param G1: SNPs from which to construct a second similarity matrix, optional. Also, see 'mixing').
+    :param K0: SNP data for creating a similarity matrix with each chromosome removed. If not given, will use test_snps.
           If you give a string, it should be the base name of a set of PLINK Bed-formatted files.
-    :type G1: a :class:`.SnpReader` or a string
+    :type K0: a class:`.SnpReader` or a string
 
-    :param mixing: Weight between 0.0 (inclusive, default) and 1.0 (inclusive) given to G1 relative to G0.
-            If you give no mixing number, G0 will get all the weight and G1 will be ignored.
+    :param K1: SNP data for creating a similarity matrix with each chromosome removed. (Also, see 'mixing').
+          If you give a string, it should be the base name of a set of PLINK Bed-formatted files.
+    :type K1: a class:`.SnpReader` or a string
+
+    :param mixing: Weight between 0.0 (inclusive, default) and 1.0 (inclusive) given to K1 relative to K0.
+            If you give no mixing number and a K1 is given, the best weight will be learned.
     :type mixing: number
 
-    :param covar: covariate information, optional: A 'pheno dictionary' contains an ndarray on the 'vals' key and a iid list on the 'iid' key.
-      If you give a string, it should be the file name of a PLINK phenotype-formatted file.
-    :type covar: a 'pheno dictionary' or a string
-
-    :param covar_by_chrom: covariate information, optional: A way to give different covariate information for each chromosome.
-            It is a dictionary from chromosome number to a 'pheno dictionary' or a string
-    :type covar_by_chrom: A dictionary from chromosome number to a 'pheno dictionary' or a string
+    :param covar: covariate information, optional: Can be any :class:`.SnpReader`, for example, :class:`.Pheno` or :class:`.SnpData`.
+           If you give a string, it should be the file name of a PLINK phenotype-formatted file.
+           (For backwards compatibility can also be dictionary with keys 'vals', 'iid', 'header')
+    :type covar: a :class:`.SnpReader` or a string
 
     :param output_file_name: Name of file to write results to, optional. If not given, no output file will be created.
     :type output_file_name: file name
@@ -231,9 +237,30 @@ def single_snp_leave_out_one_chrom(test_snps, pheno,
     :param log_delta: a re-parameterization of h2 provided for backwards compatibility.
     :type log_delta: number
 
+    :param GB_goal: gigabytes of memory the run should use, optional. If not given, will read the test_snps in blocks the same size as the kernel,
+        which is memory efficient with little overhead on computation time.
+    :type GB_goal: number
+
     :param interact_with_snp: index of a covariate to perform an interaction test with. 
             Allows for interaction testing (interact_with_snp x snp will be tested)
             default: None
+
+    :param force_full_rank: Even if kernels are defined with fewer SNPs than IIDs, create an explicit iid_count x iid_count kernel. Cannot be True if force_low_rank is True.
+    :type force_full_rank: Boolean
+
+    :param force_low_rank: Even if kernels are defined with fewer IIDs than SNPs, create a low-rank iid_count x sid_count kernel. Cannot be True if force_full_rank is True.
+    :type force_low_rank: Boolean
+
+    :param G0: Same as K0. Provided for backwards compatibility. Cannot be given if K0 is given.
+    :type G0: a :class:`.SnpReader` or a string
+
+    :param G1: Same as K1. Provided for backwards compatibility. Cannot be given if K1 is given.
+    :type G1: a :class:`.SnpReader` or a string
+
+    :param runner: a runner, optional: Tells how to run locally, multi-processor, or on a cluster.
+        If not given, the function is run locally.
+    :type runner: a runner.
+
     :rtype: Pandas dataframe with one row per test SNP. Columns include "PValue"
 
     :Example:
@@ -254,31 +281,29 @@ def single_snp_leave_out_one_chrom(test_snps, pheno,
     if force_full_rank and force_low_rank:
         raise Exception("Can't force both full rank and low rank")
 
-    test_snps, pheno, covar = fixup_three(test_snps, pheno, covar)
+    test_snps, pheno, covar = _fixup_three(test_snps, pheno, covar)
 
     chrom_list = list(set(test_snps.pos[:,0])) # find the set of all chroms mentioned in test_snps, the main testing data
     assert len(chrom_list) > 1, "single_leave_out_one_chrom requires more than one chromosome"
 
-    input_files = [test_snps, pheno, K0, G0, K1, G1, covar, covar_by_chrom]
+    input_files = [test_snps, pheno, K0, G0, K1, G1, covar] + ([] if covar_by_chrom is None else covar_by_chrom.values())
 
     def nested_closure(chrom):
         test_snps_chrom = test_snps[:,test_snps.pos[:,0]==chrom]
         covar_chrom = _create_covar_chrom(covar, covar_by_chrom, chrom)
 
-        #!!!cmk document that will use test_snps if K0 (and G0) are not given
-        K0_chrom = _K_per_chrom(K0 or G0 or test_snps, chrom, test_snps.iid) #!!!cmk why is it called "batch_size" in some places and "block_size" in others.
+        K0_chrom = _K_per_chrom(K0 or G0 or test_snps, chrom, test_snps.iid)
         K1_chrom = _K_per_chrom(K1 or G1, chrom, test_snps.iid)
 
         K0_chrom, K1_chrom, test_snps_chrom, pheno_chrom, covar_chrom  = pstutil.intersect_apply([K0_chrom, K1_chrom, test_snps_chrom, pheno, covar_chrom])
         logging.debug("# of iids now {0}".format(K0_chrom.iid_count))
+        K0_chrom, K1_chrom, block_size = _set_block_size(test_snps_chrom, K0_chrom, K1_chrom, mixing, GB_goal, force_full_rank, force_low_rank)
 
-        batch_size = determine_batch_size(test_snps_chrom,K0_chrom,K1_chrom,GB_goal,force_full_rank,force_low_rank) #Can change, in place, the batch_size of the K0 and K1 readers
-
-        distributable = _internal_single(K0_standardized=K0_chrom, test_snps=test_snps_chrom, pheno=pheno_chrom,
-                                    covar=covar_chrom, K1_standardized=K1_chrom,
+        distributable = _internal_single(K0=K0_chrom, test_snps=test_snps_chrom, pheno=pheno_chrom,
+                                    covar=covar_chrom, K1=K1_chrom,
                                     mixing=mixing, h2=h2, log_delta=log_delta, cache_file=None,
                                     force_full_rank=force_full_rank,force_low_rank=force_low_rank,
-                                    output_file_name=None, batch_size=batch_size, interact_with_snp=interact_with_snp,
+                                    output_file_name=None, block_size=block_size, interact_with_snp=interact_with_snp,
                                     runner=Local())
             
         return distributable
@@ -298,10 +323,10 @@ def single_snp_leave_out_one_chrom(test_snps, pheno,
 
     frame = map_reduce(chrom_list,
                mapper = nested_closure,
-               reducer = reducer_closure, ###!!!cmk rename input_files and output_files to inputs and outputs
-               input_files = input_files, #!!!cmk covar_by_chrom needs some code, to pull the values from any dictionary
+               reducer = reducer_closure,
+               input_files = input_files,
                output_files = [output_file_name],
-               name = "single_snp_leave_out_one_chrom, out='{0}'".format(output_file_name), #!!!cmk test this on output none
+               name = "single_snp_leave_out_one_chrom, out='{0}'".format(output_file_name),
                runner = runner)
 
     return frame
@@ -310,73 +335,129 @@ def _K_per_chrom(K, chrom, iid):
     if K is None:
         return KernelIdentity(iid)
     else:
-        K_all = _kernel_fixup(K, iid_if_none=iid, standardizer=Unit()) #!!!move this out of loop !!!cmk
+        K_all = _kernel_fixup(K, iid_if_none=iid, standardizer=Unit()) 
         if isinstance(K_all,SnpKernel):
             return SnpKernel(K_all.snpreader[:,K_all.pos[:,0] != chrom],Unit())
         else:
             raise Exception("Don't know how to make '{0}' work per chrom".format(K_all))
 
-#!!!cmk figureout when read's and read(view_ok=True) should be used
-#!!!cmk add code to test force_full_rank=False, force_low_rank=False
-def _combine_the_best_way(K0_standardized,K1_standardized,covar,y,mixing,h2,force_full_rank=False, force_low_rank=False): #!!!cmk "K0_standardized" is misnomer, right?
-    if force_full_rank and force_low_rank:
-        raise Exception("Can't force both full rank and low rank")
+def _combine_the_best_way(K0, K1, covar, y, mixing, h2, force_full_rank=False, force_low_rank=False):
+    #last return value tells if is_already_standardized is OK
+
+    assert not(force_full_rank and force_low_rank), "real assert"
+
+    if isinstance(K0,SnpKernel) and K0.sid_count == 0:
+        warnings.warn("K0 is based on zero SNPs. Will treat as an identity kernel")
+        K0 = KernelIdentity(K0.iid)
+    if isinstance(K1,SnpKernel) and K1.sid_count == 0:
+        warnings.warn("K1 is based on zero SNPs. Will treat as an identity kernel")
+        K1 = KernelIdentity(K1.iid)
+
 
     ##########################
     # A special case: both kernels are the Identity so just return the first one
     ##########################
-    if isinstance(K0_standardized,KernelIdentity) and isinstance(K1_standardized,KernelIdentity):
-        return K0_standardized, mixing or 0, h2 or 0, False
+    if isinstance(K0,KernelIdentity) and isinstance(K1,KernelIdentity):
+        warnings.warn("Both K0 and K1 are identity. Consider using linear regression instead.")
+        return K0.read(), mixing or 0, h2 or 0, True 
 
     ##########################
     # Special cases: mixing says to use just one kernel or the other kernel is just identity, so just return one kernel
     ##########################
-    if mixing == 0.0 or isinstance(K1_standardized,KernelIdentity):
-        return K0_standardized, mixing or 0.0, h2, False #!!!cmk is "read" needed because "standardize" will be inplace?
+    if mixing == 0.0 or isinstance(K1,KernelIdentity):
+        return K0, mixing or 0.0, h2, False
 
-    if mixing == 1.0 or isinstance(K0_standardized,KernelIdentity):
-        return K1_standardized, mixing or 1.0, h2, False #!!!cmk is "read" needed because "standardize" will be inplace?
+    if mixing == 1.0 or isinstance(K0,KernelIdentity):
+        return K1, mixing or 1.0, h2, False
 
     ##########################
     # A special case: Treat the kernels as collections of snps (i.e. low-rank)
     ##########################
-    #!!!cmk define sid_count
-    if (isinstance(K0_standardized,SnpKernel) and isinstance(K1_standardized,SnpKernel) and not force_full_rank
-        and (force_low_rank or K0_standardized.sid_count + K1_standardized.sid_count < K0_standardized.iid_count)):
+    if (isinstance(K0,SnpKernel) and isinstance(K1,SnpKernel) and not force_full_rank
+        and (force_low_rank or K0.sid_count + K1.sid_count < K0.iid_count)):
 
-            G = np.empty((K0_standardized.iid_count, K0_standardized.sid_count + K1_standardized.sid_count))
-            # These two need to allocate their own memory so that they can be copied into G over and over again quickly
-            G0_standardized_val = K0_standardized.read_snps().standardize(DiagKtoN()).val
-            G1_standardized_val = K1_standardized.read_snps().standardize(DiagKtoN()).val
+        G = np.empty((K0.iid_count, K0.sid_count + K1.sid_count))
+        # These two need to allocate their own memory so that they can be copied into G over and over again quickly
+        G0_standardized_val = K0.read_snps().standardize(DiagKtoN()).val
+        G1_standardized_val = K1.read_snps().standardize(DiagKtoN()).val
 
-            if mixing is None:
-                mixing, h2 = _find_mixing_from_Gs(G, covar, G0_standardized_val, G1_standardized_val, h2, y)
-            _mix_from_Gs(G, G0_standardized_val,G1_standardized_val,mixing)
+        if mixing is None:
+            mixing, h2 = _find_mixing_from_Gs(G, covar, G0_standardized_val, G1_standardized_val, h2, y)
+        _mix_from_Gs(G, G0_standardized_val,G1_standardized_val,mixing)
         
-            snpdata = SnpData(iid=K0_standardized.iid,
-                              sid=np.concatenate((K0_standardized.sid,K1_standardized.sid),axis=0),
-                              val=G,parent_string="{0}&{1}".format(G0_standardized_val,G1_standardized_val),
-                              pos=np.concatenate((K0_standardized.pos,K1_standardized.pos),axis=0)
-                              )
-            return SnpKernel(snpdata,StandardizerIdentity()), mixing, h2, True
+        snpdata = SnpData(iid=K0.iid,
+                            sid=np.concatenate((K0.sid,K1.sid),axis=0),
+                            val=G,parent_string="{0}&{1}".format(G0_standardized_val,G1_standardized_val),
+                            pos=np.concatenate((K0.pos,K1.pos),axis=0)
+                            )
+        return SnpKernel(snpdata,StandardizerIdentity()), mixing, h2, True
 
     ##########################
     # The most general case, treat the new kernels as kernels (i.e.. full rank)
     ##########################
     # These two need to allocate their own memory so that they can be copied into K over and over again quickly (otherwise they might be reading from file over and over again or changing memory used for something else)
-    K0_data = K0_standardized.read().standardize() #!!!cmk if K0_standardized is 'standardized' why does it need to be done again?
-    if K1_standardized is None:
-        K = K0_data.val
-        mixing = 0
-    else:
-        K1_data = K1_standardized.read().standardize()
-        K = np.empty(K0_data.val.shape)
-        if mixing is None:
-            mixing, h2 = _find_mixing_from_Ks(K, covar, K0_data.val, K1_data.val, h2, y)
-        _mix_from_Ks(K, K0_data.val, K1_data.val, mixing)
-        assert K.shape[0] == K.shape[1] and abs(np.diag(K).sum() - K.shape[0]) < 1e-7, "Expect mixed K to be standardized"
-    from pysnptools.kernelreader import KernelData #!!!cmk what is this needed here and not just at the top?
+    K0_data = K0.read().standardize()
+    K1_data = K1.read().standardize()
+    K = np.empty(K0_data.val.shape)
+    if mixing is None:
+        mixing, h2 = _find_mixing_from_Ks(K, covar, K0_data.val, K1_data.val, h2, y)
+    _mix_from_Ks(K, K0_data.val, K1_data.val, mixing)
+    assert K.shape[0] == K.shape[1] and abs(np.diag(K).sum() - K.shape[0]) < 1e-7, "Expect mixed K to be standardized"
     return KernelData(val=K,iid=K0_data.iid), mixing, h2, True
+
+def _set_block_size(test_snps, K0, K1, mixing, GB_goal, force_full_rank, force_low_rank):
+    min_count = _internal_determine_block_size(K0, K1, mixing, force_full_rank, force_low_rank)
+    block_size = _block_size_from_GB_goal(GB_goal, test_snps.iid_count, min_count)
+    logging.info("Dividing SNPs by {0}".format(-(test_snps.sid_count//-block_size)))
+
+    if isinstance(K0,SnpKernel):
+        K0 = SnpKernel(K0.snpreader,K0.standardizer,block_size=block_size)
+    if isinstance(K1,SnpKernel):
+        K1 = SnpKernel(K1.snpreader,K1.standardizer,block_size=block_size)
+    return K0, K1, block_size
+
+
+def _internal_determine_block_size(K0, K1, mixing, force_full_rank, force_low_rank):
+    assert not(force_full_rank and force_low_rank), "real assert"
+
+    if isinstance(K0,SnpKernel) and K0.sid_count == 0:
+        K0 = KernelIdentity(K0.iid)
+    if isinstance(K1,SnpKernel) and K1.sid_count == 0:
+        K1 = KernelIdentity(K1.iid)
+
+
+    ##########################
+    # A special case: both kernels are the Identity so just return the first one
+    ##########################
+    if isinstance(K0,KernelIdentity) and isinstance(K1,KernelIdentity):
+        return K0.iid_count
+
+    ##########################
+    # Special cases: mixing says to use just one kernel or the other kernel is just identity, so just return one kernel
+    ##########################
+    if mixing == 0.0 or isinstance(K1,KernelIdentity):
+        if isinstance(K0,SnpKernel) and not force_full_rank and (force_low_rank or K0.sid_count < K0.iid_count):
+            return K0.sid_count
+        else:
+            return K0.iid_count
+
+    if mixing == 1.0 or isinstance(K0,KernelIdentity):
+        if isinstance(K1,SnpKernel) and not force_full_rank and (force_low_rank or K1.sid_count < K1.iid_count):
+            return K1.sid_count
+        else:
+            return K1.iid_count
+
+    ##########################
+    # A special case: Treat the kernels as collections of snps (i.e. low-rank)
+    ##########################
+    if (isinstance(K0,SnpKernel) and isinstance(K1,SnpKernel) and not force_full_rank
+        and (force_low_rank or K0.sid_count + K1.sid_count < K0.iid_count)):
+        return K0.sid_count + K1.sid_count 
+
+    ##########################
+    # The most general case, treat the new kernels as kernels (i.e.. full rank)
+    ##########################
+    return K0.iid_count
 
 def _create_dataframe(row_count):
     dataframe = pd.DataFrame(
@@ -397,13 +478,13 @@ def _create_dataframe(row_count):
 
     return dataframe
 
-def _internal_single(K0_standardized, test_snps, pheno, covar, K1_standardized,
-                 mixing, #!!test mixing and G1
-                 h2, log_delta,
+def _internal_single(K0, test_snps, pheno, covar, K1,
+                 mixing, h2, log_delta,
                  cache_file, force_full_rank,force_low_rank,
-                 output_file_name, batch_size, interact_with_snp, runner):
-    assert K0_standardized is not None, "real assert"
-    assert K1_standardized is not None, "real assert"
+                 output_file_name, block_size, interact_with_snp, runner):
+    assert K0 is not None, "real assert"
+    assert K1 is not None, "real assert"
+    assert block_size is not None, "real assert"
     assert mixing is None or 0.0 <= mixing <= 1.0
     if force_full_rank and force_low_rank:
         raise Exception("Can't force both full rank and low rank")
@@ -412,9 +493,9 @@ def _internal_single(K0_standardized, test_snps, pheno, covar, K1_standardized,
     if log_delta is not None:
         h2 = 1.0/(np.exp(log_delta)+1)
 
-    covar = np.hstack((covar.read(view_ok=True).val,np.ones((test_snps.iid_count, 1))))  #We always add 1's to the end.
+    covar = np.c_[covar.read(view_ok=True,order='A').val,np.ones((test_snps.iid_count, 1))]  #view_ok because np.c_ will allocation new memory
 
-    y =  pheno.read(view_ok=True).val
+    y =  pheno.read(view_ok=True,order='A').val #view_ok because this code already did a fresh read to look for any missing values 
 
     if cache_file is not None and os.path.exists(cache_file):
         lmm = fastLMM(X=covar, Y=y, G=None, K=None)
@@ -423,25 +504,23 @@ def _internal_single(K0_standardized, test_snps, pheno, covar, K1_standardized,
             lmm.S = data['arr_1']
             h2 = data['arr_2'][0]
             mixing = data['arr_2'][1]
-    else: #!!!need to best regular single_snp on K1=None and confirm that no mixing happens
-        assert K0_standardized.iid0 is K0_standardized.iid1, "Expect K0 to be square"
-        assert K1_standardized is None or K1_standardized.iid0 is K1_standardized.iid1, "Expect K0 and K1 to be square"
-         #!!!cmk if this is slow then having it before the outer loop will require it being processed over and over and over again
-        K, mixing, h2, in_place_ok = _combine_the_best_way(K0_standardized,K1_standardized,covar,y,mixing,h2,force_full_rank=force_full_rank,force_low_rank=force_low_rank)
-        #!!!cmk if both kernels are None (or identity) should just call linear regression
+    else:
+        assert K0.iid0 is K0.iid1, "Expect K0 to be square"
+        assert K1 is None or K1.iid0 is K1.iid1, "Expect K0 and K1 to be square"
+        K, mixing, h2, is_already_standardized = _combine_the_best_way(K0,K1,covar,y,mixing,h2,force_full_rank=force_full_rank,force_low_rank=force_low_rank)
         if (isinstance(K,SnpKernel) and not force_full_rank and (force_low_rank or K.sid_count < K.iid_count)):
-            if not in_place_ok:
+            if not is_already_standardized:
                 G = K.read_snps().standardize(DiagKtoN())
             else:
-                G = K.read_snps(view_ok=True)
+                G = K.snpreader
             lmm = fastLMM(X=covar, Y=y, K=None, G=G.val, inplace=True)
         else:
-            if not in_place_ok:
+            if not is_already_standardized:
                 K = K.read().standardize()
             lmm = fastLMM(X=covar, Y=y, K=K.val, G=None, inplace=True)
 
         if h2 is None:
-            result = lmm.findH2()  #!!!cmk if this is slow then having it before the outter loop will require it being processed over and over and over again
+            result = lmm.findH2()
             h2 = result['h2']
         logging.info("h2={0}".format(h2))
 
@@ -459,9 +538,7 @@ def _internal_single(K0_standardized, test_snps, pheno, covar, K1_standardized,
     else:
         interact = None
 
-    if batch_size is None:
-       batch_size = test_snps.sid_count #!!!cmk what's the point in having an inner loop is everything is done in one batch?
-    work_count = -(test_snps.sid_count // -batch_size) #Find the work count based on batch size (rounding up)
+    work_count = -(test_snps.sid_count // -block_size) #Find the work count based on batch size (rounding up)
 
     # We define three closures, that is, functions define inside function so that the inner function has access to the local variables of the outer function.
     def debatch_closure(work_index):
@@ -473,12 +550,12 @@ def _internal_single(K0_standardized, test_snps, pheno, covar, K1_standardized,
         start = debatch_closure(work_index)
         end = debatch_closure(work_index+1)
 
-        snps_read = test_snps[:,start:end].read().standardize() #!!!could it be better to standardize train (if available) and test together?
+        snps_read = test_snps[:,start:end].read().standardize()
         if interact_with_snp is not None:
             variables_to_test = snps_read.val * interact[:,np.newaxis]
         else:
             variables_to_test = snps_read.val
-        res = lmm.nLLeval(h2=h2, dof=None, scale=1.0, penalty=0.0, snps=variables_to_test) #!!!the code assumes that this is the slowest bit. Is it?
+        res = lmm.nLLeval(h2=h2, dof=None, scale=1.0, penalty=0.0, snps=variables_to_test)
 
         beta = res['beta']
         
@@ -532,7 +609,9 @@ def _create_covar_chrom(covar, covar_by_chrom, chrom):
         covar_by_chrom_chrom = covar_by_chrom[chrom]
         covar_by_chrom_chrom = _pheno_fixup(covar_by_chrom_chrom, iid_if_none=covar)
         covar_after,  covar_by_chrom_chrom = pstutil.intersect_apply([covar,  covar_by_chrom_chrom])
-        ret = SnpData(iid=covar_after.iid,sid=np.r_[covar_after.sid,covar_by_chrom_chrom.sid],val=np.c_[covar_after.read(order='A',view_ok=True).val,covar_by_chrom_chrom.read(order='A',view_ok=True).val])
+        ret = SnpData(iid=covar_after.iid,sid=np.r_[covar_after.sid,covar_by_chrom_chrom.sid],
+                      val=np.c_[covar_after.read(order='A',view_ok=True).val,
+                                covar_by_chrom_chrom.read(order='A',view_ok=True).val]) #view_ok because np.c_ will allocate new memory.
         return ret
     else:
         return covar
@@ -545,7 +624,7 @@ def _find_mixing_from_Gs(G, covar, G0_standardized_val, G1_standardized_val, h2,
     resmin=[None]
     def f(mixing,G0_standardized_val=G0_standardized_val,G1_standardized_val=G1_standardized_val,covar=covar,y=y,**kwargs):
 
-        if not isinstance(mixing, (int, long, float, complex)): #!!!cmk
+        if not isinstance(mixing, (int, long, float, complex)):
             assert mixing.ndim == 1 and mixing.shape[0] == 1
             mixing = mixing[0]
 
@@ -557,10 +636,10 @@ def _find_mixing_from_Gs(G, covar, G0_standardized_val, G1_standardized_val, h2,
         logging.info("mixing_from_Gs\t{0}\th2\t{1}\tnLL\t{2}".format(mixing,result['h2'],result['nLL']))
         #logging.info("reporter:counter:single_snp,find_mixing_from_Gs_count,1")
         assert not np.isnan(result['nLL']), "nLL should be a number (not a NaN)"
-        return result['nLL'] #!!!cmk what does switching to -log likelihood to to single_snp?
+        return result['nLL']
     mixing,nLL = mingrid.minimize1D(f=f, nGrid=10, minval=0.0, maxval=1.0,verbose=False)
 
-    if not isinstance(mixing, (int, long, float, complex)): #!!!cmk
+    if not isinstance(mixing, (int, long, float, complex)):
         assert mixing.ndim == 1 and mixing.shape[0] == 1
         mixing = mixing[0]
 
@@ -574,7 +653,7 @@ def _find_mixing_from_Ks(K, covar, K0_val, K1_val, h2, y):
     resmin=[None]
     def f(mixing,K0_val=K0_val,K1_val=K1_val,covar=covar,y=y,**kwargs):
 
-        if not isinstance(mixing, (int, long, float, complex)): #!!!cmk
+        if not isinstance(mixing, (int, long, float, complex)):
             assert mixing.ndim == 1 and mixing.shape[0] == 1
             mixing = mixing[0]
 
@@ -586,10 +665,10 @@ def _find_mixing_from_Ks(K, covar, K0_val, K1_val, h2, y):
         logging.debug("mixing_from_Ks\t{0}\th2\t{1}\tnLL\t{2}".format(mixing,result['h2'],result['nLL']))
         #logging.info("reporter:counter:single_snp,find_mixing_from_Ks_count,1")
         assert not np.isnan(result['nLL']), "nLL should be a number (not a NaN)"
-        return result['nLL'] #!!!cmk what does switching to -log likelihood to to single_snp?
+        return result['nLL']
     mixing,nLL = mingrid.minimize1D(f=f, nGrid=10, minval=0.0, maxval=1.0,verbose=False)
 
-    if not isinstance(mixing, (int, long, float, complex)): #!!!cmk
+    if not isinstance(mixing, (int, long, float, complex)):
         assert mixing.ndim == 1 and mixing.shape[0] == 1
         mixing = mixing[0]
 
@@ -604,7 +683,7 @@ def _mix_from_Gs(G, G0_standardized_val, G1_standardized_val, mixing):
     G[:,G0_standardized_val.shape[1]:] *= np.sqrt(mixing)
 
 def _mix_from_Ks(K, K0_val, K1_val, mixing):
-    K[:,:] = K0_val * (1.0-mixing) + K1_val * mixing #!!!cmk does this avoid memory allocation? Is there a way to avoid memory allocation?
+    K[:,:] = K0_val * (1.0-mixing) + K1_val * mixing
 
 if __name__ == "__main__":
 
