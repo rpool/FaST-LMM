@@ -6,7 +6,6 @@ import doctest
 import pandas as pd
 
 from fastlmm.association import single_snp
-from fastlmm.association import single_snp_leave_out_one_chrom
 import pysnptools.util.pheno as pstpheno
 from fastlmm.feature_selection.test import TestFeatureSelection
 from fastlmm.util.runner import Local, HPC, LocalMultiProc
@@ -47,8 +46,8 @@ class TestSingleSnp(unittest.TestCase):
         test_idx = snps.sid_to_index(test_sid)
 
         for G0,G1 in [(snps[:,sim_idx],KernelIdentity(snps.iid)),(KernelIdentity(snps.iid),snps[:,sim_idx])]:
-            frame_h2 = single_snp(test_snps=snps[:,test_idx], pheno=pheno, G0=G0,G1=G1, covar=covar,h2=.5)
-            frame_log_delta = single_snp(test_snps=snps[:,test_idx], pheno=pheno, G0=G0,G1=G1, covar=covar,log_delta=0)
+            frame_h2 = single_snp(test_snps=snps[:,test_idx], pheno=pheno, G0=G0,G1=G1, covar=covar,h2=.5,leave_out_one_chrom=False)
+            frame_log_delta = single_snp(test_snps=snps[:,test_idx], pheno=pheno, G0=G0,G1=G1, covar=covar,log_delta=0,leave_out_one_chrom=False)
             for frame in [frame_h2, frame_log_delta]:
                 referenceOutfile = TestFeatureSelection.reference_file("single_snp/topsnps.single.txt")
                 reference = pd.read_table(referenceOutfile,sep="\t") # We've manually remove all comments and blank lines from this file
@@ -72,7 +71,7 @@ class TestSingleSnp(unittest.TestCase):
         covar = self.cov_fn
 
         output_file_name = self.file_name("mixing")
-        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno,G0=test_snps[:,10:100], 
+        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno,G0=test_snps[:,10:100], leave_out_one_chrom=False,
                                       covar=covar, G1=test_snps[:,100:200],mixing=None,
                                       output_file_name=output_file_name
                                       )
@@ -86,7 +85,7 @@ class TestSingleSnp(unittest.TestCase):
         covar = self.cov_fn
 
         output_file_name = self.file_name("mixingKs")
-        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno,K0=SnpKernel(test_snps[:,10:100],Unit()),
+        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno,K0=SnpKernel(test_snps[:,10:100],Unit()),leave_out_one_chrom=False,
                                       covar=covar, K1=SnpKernel(test_snps[:,100:200],Unit()),mixing=None,
                                       output_file_name=output_file_name
                                       )
@@ -101,7 +100,7 @@ class TestSingleSnp(unittest.TestCase):
         covar = self.cov_fn
 
         output_file_name = self.file_name("mixid")
-        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno,G0=test_snps[:,10:100], 
+        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno,G0=test_snps[:,10:100], leave_out_one_chrom=False,
                                       covar=covar, K1=KernelIdentity(test_snps.iid),mixing=.25,
                                       output_file_name=output_file_name
                                       )
@@ -116,7 +115,7 @@ class TestSingleSnp(unittest.TestCase):
         covar = self.cov_fn
 
         output_file = self.file_name("one")
-        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno, mixing=0,
+        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno, mixing=0,leave_out_one_chrom=False,
                                   G0=test_snps, covar=covar, 
                                   output_file_name=output_file
                                   )
@@ -130,7 +129,7 @@ class TestSingleSnp(unittest.TestCase):
         covar = self.cov_fn
 
         output_file = self.file_name("noK0")
-        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno, mixing=1,
+        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno, mixing=1,leave_out_one_chrom=False,
                                   G1=test_snps, covar=covar, 
                                   output_file_name=output_file
                                   )
@@ -144,7 +143,7 @@ class TestSingleSnp(unittest.TestCase):
         covar = self.cov_fn
 
         output_file = self.file_name("gb_goal")
-        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno, mixing=0,
+        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno, mixing=0,leave_out_one_chrom=False,
                                   G0=test_snps, covar=covar, GB_goal=0,
                                   output_file_name=output_file
                                   )
@@ -152,7 +151,7 @@ class TestSingleSnp(unittest.TestCase):
         self.compare_files(frame,"one")
 
         output_file = self.file_name("gb_goal2")
-        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno, mixing=0,
+        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno, mixing=0,leave_out_one_chrom=False,
                                   G0=test_snps, covar=covar, GB_goal=.12,
                                   output_file_name=output_file
                                   )
@@ -166,7 +165,7 @@ class TestSingleSnp(unittest.TestCase):
         covar = self.cov_fn
 
         output_file = self.file_name("other")
-        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno,
+        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno,leave_out_one_chrom=False,
                                   K1=test_snps, covar=covar, 
                                   output_file_name=output_file
                                   )
@@ -180,7 +179,7 @@ class TestSingleSnp(unittest.TestCase):
         covar = self.cov_fn
 
         output_file = self.file_name("none")
-        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno, mixing=0,
+        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno, mixing=0,leave_out_one_chrom=False,
                                   K0=KernelIdentity(test_snps.iid), covar=covar, 
                                   output_file_name=output_file
                                   )
@@ -194,7 +193,7 @@ class TestSingleSnp(unittest.TestCase):
         covar = self.cov_fn
 
         output_file = self.file_name("interact")
-        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno, mixing=0,
+        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno, mixing=0,leave_out_one_chrom=False,
                                   G0=test_snps, covar=covar, interact_with_snp=1,
                                   output_file_name=output_file
                                   )
@@ -210,7 +209,7 @@ class TestSingleSnp(unittest.TestCase):
 
         output_file_name = self.file_name("preload_files")
 
-        frame = single_snp(test_snps=bed[:,:10], pheno=pheno, G0=test_snps, mixing=0,
+        frame = single_snp(test_snps=bed[:,:10], pheno=pheno, G0=test_snps, mixing=0,leave_out_one_chrom=False,
                                   covar=covar, output_file_name=output_file_name
                                   )
         self.compare_files(frame,"one")
@@ -226,7 +225,7 @@ class TestSingleSnp(unittest.TestCase):
 
         output_file_name = self.file_name("snc")
 
-        frame = single_snp(test_snps=snc[:,:10], pheno=pheno, G0=snc, mixing=0,
+        frame = single_snp(test_snps=snc[:,:10], pheno=pheno, G0=snc, mixing=0,leave_out_one_chrom=False,
                                   covar=covar, output_file_name=output_file_name
                                   )
         self.compare_files(frame,"snc")
@@ -239,7 +238,7 @@ class TestSingleSnp(unittest.TestCase):
 
         output_file_name = self.file_name("G0_has_reader")
 
-        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno, G0=test_snps, 
+        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno, G0=test_snps, leave_out_one_chrom=False,
                                   covar=covar, mixing=0,
                                   output_file_name=output_file_name
                                   )
@@ -251,7 +250,7 @@ class TestSingleSnp(unittest.TestCase):
         pheno = self.phen_fn
 
         output_file_name = self.file_name("no_cov")
-        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno, G0=test_snps, mixing=0,
+        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno, G0=test_snps, mixing=0,leave_out_one_chrom=False,
                                           output_file_name=output_file_name
                                           )
 
@@ -267,7 +266,7 @@ class TestSingleSnp(unittest.TestCase):
         covar['vals'] = np.delete(covar['vals'], np.s_[:],1) #Remove all the columns
         covar['header'] = []
 
-        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno, G0=test_snps, 
+        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno, G0=test_snps, leave_out_one_chrom=False,
                                   covar=covar, mixing=0,
                                   output_file_name=output_file_name
                                   )
@@ -282,7 +281,7 @@ class TestSingleSnp(unittest.TestCase):
 
         output_file_name = self.file_name("G1")
         for force_full_rank,force_low_rank in [(False,False),(True,False),(False,True)]:
-            frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno,G0=test_snps[:,10:100], 
+            frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno,G0=test_snps[:,10:100], leave_out_one_chrom=False,
                                           covar=covar, G1=test_snps[:,100:200],
                                           mixing=.5,force_full_rank=force_full_rank,force_low_rank=force_low_rank,
                                           output_file_name=output_file_name
@@ -300,14 +299,14 @@ class TestSingleSnp(unittest.TestCase):
         cache_file = self.file_name("cache_file")+".npz"
         if os.path.exists(cache_file):
             os.remove(cache_file)
-        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno,G0=test_snps[:,10:100], 
+        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno,G0=test_snps[:,10:100], leave_out_one_chrom=False,
                                       covar=covar, G1=test_snps[:,100:200],
                                       mixing=.5,
                                       output_file_name=output_file_name,
                                       cache_file = cache_file
                                       )
         self.compare_files(frame,"G1")
-        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno,G0=test_snps[:,10:100], 
+        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno,G0=test_snps[:,10:100], leave_out_one_chrom=False,
                                       covar=covar, G1=test_snps[:,100:200],
                                       mixing=.5,
                                       output_file_name=output_file_name,
@@ -323,7 +322,7 @@ class TestSingleSnp(unittest.TestCase):
         covar = self.cov_fn
 
         output_file_name = self.file_name("G1_mixing")
-        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno, G0=test_snps, 
+        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno, G0=test_snps, leave_out_one_chrom=False,
                                       covar=covar, 
                                       G1=test_snps[:,100:200],
                                       mixing=0,
@@ -340,7 +339,7 @@ class TestSingleSnp(unittest.TestCase):
         covar = self.cov_fn
 
         try:
-            frame = single_snp(test_snps=test_snps,G0=test_snps,pheno=pheno,mixing=0,covar=covar,sid_list=['1_4','bogus sid','1_9'])
+            frame = single_snp(test_snps=test_snps,G0=test_snps,pheno=pheno,leave_out_one_chrom=False,mixing=0,covar=covar,sid_list=['1_4','bogus sid','1_9'])
             failed = False
         except:
             failed = True
@@ -357,7 +356,7 @@ class TestSingleSnp(unittest.TestCase):
         
         covar = self.cov_fn
         output_file_name = self.file_name("cid_intersect")
-        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno, G0=test_snps, 
+        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno, G0=test_snps, leave_out_one_chrom=False,
                                   covar=covar, mixing=0,
                                   output_file_name=output_file_name
                                   )
@@ -413,7 +412,7 @@ class TestSingleSnpLeaveOutOneChrom(unittest.TestCase):
         covar = self.cov_fn
 
         output_file = self.file_name("one_looc")
-        frame = single_snp_leave_out_one_chrom(test_snps, pheno,
+        frame = single_snp(test_snps, pheno,
                                   covar=covar, mixing=0,
                                   output_file_name=output_file,
                                   )
@@ -427,7 +426,7 @@ class TestSingleSnpLeaveOutOneChrom(unittest.TestCase):
         covar = self.cov_fn
 
         output_file = self.file_name("interact_looc")
-        frame = single_snp_leave_out_one_chrom(test_snps, pheno,
+        frame = single_snp(test_snps, pheno,
                                   covar=covar, mixing=0, interact_with_snp=0,
                                   output_file_name=output_file
                                   )
@@ -442,7 +441,7 @@ class TestSingleSnpLeaveOutOneChrom(unittest.TestCase):
         covar = SnpData(iid=covar.iid,sid=["pheno-1"],val=covar.val)
         covar_by_chrom = {chrom:self.cov_fn for chrom in xrange(1,6)}
         output_file = self.file_name("covar_by_chrom")
-        frame = single_snp_leave_out_one_chrom(test_snps, pheno,
+        frame = single_snp(test_snps, pheno,
                                     covar=covar, mixing=0,
                                     covar_by_chrom=covar_by_chrom,
                                     output_file_name=output_file
@@ -459,7 +458,7 @@ class TestSingleSnpLeaveOutOneChrom(unittest.TestCase):
         covar = SnpData(iid=covar.iid,sid=["pheno-1"],val=covar.val)
         covar_by_chrom = {chrom:self.cov_fn for chrom in xrange(1,6)}
         output_file = self.file_name("covar_by_chrom_mixing")
-        frame = single_snp_leave_out_one_chrom(test_snps, pheno,
+        frame = single_snp(test_snps, pheno,
                                     covar=covar,
                                     covar_by_chrom=covar_by_chrom,
                                     output_file_name=output_file

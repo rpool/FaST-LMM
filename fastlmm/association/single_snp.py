@@ -30,10 +30,11 @@ from fastlmm.association.fastlmmmodel import _snps_fixup, _pheno_fixup, _kernel_
 
 def single_snp(test_snps, pheno, K0=None,
                  K1=None, mixing=None,
-                 covar=None, output_file_name=None, h2=None, log_delta=None,
+                 covar=None, covar_by_chrom=None, leave_out_one_chrom=True, output_file_name=None, h2=None, log_delta=None,
                  cache_file = None, GB_goal=None, interact_with_snp=None, force_full_rank=False, force_low_rank=False, G0=None, G1=None, runner=None):
     """
-    Function performing single SNP GWAS with REML. Will reorder and intersect IIDs as needed.
+    Function performing single SNP GWAS using cross validation over the chromosomes and REML. Will reorder and intersect IIDs as needed.
+    (For backwards compatibility, you may use 'leave_out_one_chrom=False' to skip cross validation, but that is not recommended.)
 
     :param test_snps: SNPs to test. Can be any :class:`.SnpReader`. If you give a string, it should be the base name of a set of PLINK Bed-formatted files.
            (For backwards compatibility can also be dictionary with keys 'vals', 'iid', 'header')
@@ -45,15 +46,15 @@ def single_snp(test_snps, pheno, K0=None,
            (For backwards compatibility can also be dictionary with keys 'vals', 'iid', 'header')
     :type pheno: a :class:`.SnpReader` or a string
 
-    :param K0: A similarity matrix. If not given, will use test_snps.
-          If a :class:`.SnpReader` is given, the similarity matrix will be created from the SNP values.
-          If you give a string, it should be the name of a :class:`.KernelNpz` file or base name of a set of PLINK Bed-formatted files.
-    :type K0: a :class:`.KernelReader` or :class:`.SnpReader` or a string
+    :param K0: SNPs from which to create a similarity matrix. If not given, will use test_snps.
+           Can be any :class:`.SnpReader`. If you give a string, it should be the base name of a set of PLINK Bed-formatted files.
+           (When leave_out_one_chrom is False, can be a :class:`.KernelReader` or a :class:`.KernelNpz`-formated file name.)
+    :type K0: :class:`.SnpReader` or a string (or :class:`.KernelReader`)
 
-    :param K1: A second similarity kernel, optional. (Also, see 'mixing').
-          If a :class:`.SnpReader` is given, the similarity matrix will be created from the SNP values.
-          If you give a string, it should be the name of a :class:`.KernelNpz` file or base name of a set of PLINK Bed-formatted files.
-    :type K1: a :class:`.KernelReader` or :class:`.SnpReader` or a string
+    :param K1: SNPs from which to create a second similarity matrix, optional. (Also, see 'mixing').
+           Can be any :class:`.SnpReader`. If you give a string, it should be the base name of a set of PLINK Bed-formatted files.
+           (When leave_out_one_chrom is False, can be a :class:`.KernelReader` or a :class:`.KernelNpz`-formated file name.)
+    :type K1: :class:`.SnpReader` or a string (or :class:`.KernelReader`)
 
     :param mixing: Weight between 0.0 (inclusive, default) and 1.0 (inclusive) given to K1 relative to K0.
             If you give no mixing number and a K1 is given, the best weight will be learned.
@@ -64,6 +65,11 @@ def single_snp(test_snps, pheno, K0=None,
            (For backwards compatibility can also be dictionary with keys 'vals', 'iid', 'header')
     :type covar: a :class:`.SnpReader` or a string
 
+    :param leave_out_one_chrom: Perform single SNP GWAS via cross validation over the chromosomes. Default to True.
+           (Warning: setting True can cause proximal contamination.)
+    :type leave_out_one_chrom: boolean
+    
+
     :param output_file_name: Name of file to write results to, optional. If not given, no output file will be created.
     :type output_file_name: file name
 
@@ -72,13 +78,13 @@ def single_snp(test_snps, pheno, K0=None,
             If mixing is unspecified, then h2 must also be unspecified.
     :type h2: number
 
-    :param log_delta: a re-parameterization of h2 provided for backwards compatibility.
+    :param log_delta: a re-parameterization of h2 provided for backwards compatibility. h2 is 1./(exp(log_delta)+1)
     :type log_delta: number
 
     :param cache_file: Name of  file to read or write cached precomputation values to, optional.
                 If not given, no cache file will be used.
-                If given and file does not exists, will write precomputation values to file.
-                If given and file does exists, will read precomputation values from file.
+                If given and file does not exist, will write precomputation values to file.
+                If given and file does exist, will read precomputation values from file.
                 The file contains the U and S matrix from the decomposition of the training matrix. It is in Python's np.savez (*.npz) format.
                 Calls using the same cache file should have the same 'K0' and 'K1'
                 If given and the file does exist then K0 and K1 need not be given.
@@ -110,6 +116,8 @@ def single_snp(test_snps, pheno, K0=None,
 
     :rtype: Pandas dataframe with one row per test SNP. Columns include "PValue"
 
+
+
     :Example:
 
     >>> import logging
@@ -119,48 +127,94 @@ def single_snp(test_snps, pheno, K0=None,
     >>> logging.basicConfig(level=logging.INFO)
     >>> snpreader = Bed("../feature_selection/examples/toydata")
     >>> pheno_fn = "../feature_selection/examples/toydata.phe"
-    >>> results_dataframe = single_snp(test_snps=snpreader[:,5000:10000],pheno=pheno_fn,K0=snpreader[:,0:5000],h2=.2,mixing=0)
+    >>> results_dataframe = single_snp(test_snps="../feature_selection/examples/toydata.5chrom", pheno=pheno_fn, h2=.2)
     >>> print results_dataframe.iloc[0].SNP,round(results_dataframe.iloc[0].PValue,7),len(results_dataframe)
-    null_7487 3.4e-06 5000
+    null_576 1e-07 10000
+
 
     """
     t0 = time.time()
     runner = runner or Local()
     if force_full_rank and force_low_rank:
         raise Exception("Can't force both full rank and low rank")
+    if not leave_out_one_chrom:
+        warnings.warn("leave_out_one_chrom=False can cause proximal contamination.")
 
-    test_snps, pheno, covar = _fixup_three(test_snps, pheno, covar)
-
-    K0 = _kernel_fixup(K0 or G0 or test_snps, iid_if_none=test_snps.iid, standardizer=Unit())
-    K1 = _kernel_fixup(K1 or G1, iid_if_none=test_snps.iid, standardizer=Unit())
-
-    K0, K1, test_snps, pheno, covar  = pstutil.intersect_apply([K0, K1, test_snps, pheno, covar])
-    logging.debug("# of iids now {0}".format(K0.iid_count))
-    K0, K1, block_size = _set_block_size(test_snps, K0, K1, mixing, GB_goal, force_full_rank, force_low_rank)
-
-    frame =  _internal_single(K0=K0, test_snps=test_snps, pheno=pheno,
-                                covar=covar, K1=K1,
-                                mixing=mixing, h2=h2, log_delta=log_delta,
-                                cache_file = cache_file, force_full_rank=force_full_rank,force_low_rank=force_low_rank,
-                                output_file_name=output_file_name,block_size=block_size, interact_with_snp=interact_with_snp,
-                                runner=runner)
-
-    sid_index_range = IntRangeSet(frame['sid_index'])
-    assert sid_index_range == (0,test_snps.sid_count), "Some SNP rows are missing from the output"
-
-    return frame
-
-overhead_gig = .127
-factor = 8.5  # found via trial and error
-
-def _fixup_three(test_snps, pheno, covar):
     assert test_snps is not None, "test_snps must be given as input"
     test_snps = _snps_fixup(test_snps)
     pheno = _pheno_fixup(pheno).read()
     assert pheno.sid_count == 1, "Expect pheno to be just one variable"
     pheno = pheno[(pheno.val==pheno.val)[:,0],:]
     covar = _pheno_fixup(covar, iid_if_none=pheno.iid)
-    return     test_snps, pheno, covar
+
+    if not leave_out_one_chrom:
+        assert covar_by_chrom is None, "When 'leave_out_one_chrom' is False, 'covar_by_chrom' must be None"
+        K0 = _kernel_fixup(K0 or G0 or test_snps, iid_if_none=test_snps.iid, standardizer=Unit())
+        K1 = _kernel_fixup(K1 or G1, iid_if_none=test_snps.iid, standardizer=Unit())
+
+        K0, K1, test_snps, pheno, covar  = pstutil.intersect_apply([K0, K1, test_snps, pheno, covar])
+        logging.debug("# of iids now {0}".format(K0.iid_count))
+        K0, K1, block_size = _set_block_size(test_snps, K0, K1, mixing, GB_goal, force_full_rank, force_low_rank)
+
+        frame =  _internal_single(K0=K0, test_snps=test_snps, pheno=pheno,
+                                    covar=covar, K1=K1,
+                                    mixing=mixing, h2=h2, log_delta=log_delta,
+                                    cache_file = cache_file, force_full_rank=force_full_rank,force_low_rank=force_low_rank,
+                                    output_file_name=output_file_name,block_size=block_size, interact_with_snp=interact_with_snp,
+                                    runner=runner)
+        sid_index_range = IntRangeSet(frame['sid_index'])
+        assert sid_index_range == (0,test_snps.sid_count), "Some SNP rows are missing from the output"
+    else:
+        chrom_list = list(set(test_snps.pos[:,0])) # find the set of all chroms mentioned in test_snps, the main testing data
+        assert len(chrom_list) > 1, "single_leave_out_one_chrom requires more than one chromosome"
+
+        input_files = [test_snps, pheno, K0, G0, K1, G1, covar] + ([] if covar_by_chrom is None else covar_by_chrom.values())
+
+        def nested_closure(chrom):
+            test_snps_chrom = test_snps[:,test_snps.pos[:,0]==chrom]
+            covar_chrom = _create_covar_chrom(covar, covar_by_chrom, chrom)
+
+            K0_chrom = _K_per_chrom(K0 or G0 or test_snps, chrom, test_snps.iid)
+            K1_chrom = _K_per_chrom(K1 or G1, chrom, test_snps.iid)
+
+            K0_chrom, K1_chrom, test_snps_chrom, pheno_chrom, covar_chrom  = pstutil.intersect_apply([K0_chrom, K1_chrom, test_snps_chrom, pheno, covar_chrom])
+            logging.debug("# of iids now {0}".format(K0_chrom.iid_count))
+            K0_chrom, K1_chrom, block_size = _set_block_size(test_snps_chrom, K0_chrom, K1_chrom, mixing, GB_goal, force_full_rank, force_low_rank)
+
+            distributable = _internal_single(K0=K0_chrom, test_snps=test_snps_chrom, pheno=pheno_chrom,
+                                        covar=covar_chrom, K1=K1_chrom,
+                                        mixing=mixing, h2=h2, log_delta=log_delta, cache_file=None,
+                                        force_full_rank=force_full_rank,force_low_rank=force_low_rank,
+                                        output_file_name=None, block_size=block_size, interact_with_snp=interact_with_snp,
+                                        runner=Local())
+            
+            return distributable
+
+        def reducer_closure(frame_sequence):
+            frame = pd.concat(frame_sequence)
+            frame.sort_values(by="PValue", inplace=True)
+            frame.index = np.arange(len(frame))
+            if output_file_name is not None:
+                frame.to_csv(output_file_name, sep="\t", index=False)
+            logging.info("PhenotypeName\t{0}".format(pheno.sid[0]))
+            logging.info("SampleSize\t{0}".format(test_snps.iid_count))
+            logging.info("SNPCount\t{0}".format(test_snps.sid_count))
+            logging.info("Runtime\t{0}".format(time.time()-t0))
+
+            return frame
+
+        frame = map_reduce(chrom_list,
+                   mapper = nested_closure,
+                   reducer = reducer_closure,
+                   input_files = input_files,
+                   output_files = [output_file_name],
+                   name = "single_snp_leave_out_one_chrom, out='{0}'".format(output_file_name),
+                   runner = runner)
+
+    return frame
+
+overhead_gig = .127
+factor = 8.5  # found via trial and error
 
 def _GB_goal_from_block_size(block_size, iid_count, kernel_gig):
     left_bytes = block_size * (iid_count * 8.0 *factor)
@@ -191,145 +245,15 @@ def _block_size_from_GB_goal(GB_goal, iid_count, min_count):
 
     return block_size
 
-def single_snp_leave_out_one_chrom(test_snps, pheno,
-                 K0=None, K1=None, mixing=None,
-                 covar=None,covar_by_chrom=None,
-                 output_file_name=None, h2=None, log_delta=None,
-                 interact_with_snp=None, force_full_rank=False, force_low_rank=False, GB_goal=None, G0=None, G1=None, runner=None):
+def single_snp_leave_out_one_chrom(*args, **kwargs):
     """
-    Function performing single SNP GWAS via cross validation over the chromosomes with REML. Will reorder and intersect IIDs as needed.
-
-    :param test_snps: SNPs to test. Can be any :class:`.SnpReader`. If you give a string, it should be the base name of a set of PLINK Bed-formatted files.
-           (For backwards compatibility can also be dictionary with keys 'vals', 'iid', 'header')
-    :type test_snps: a :class:`.SnpReader` or a string
-
-    :param pheno: A single phenotype: Can be any :class:`.SnpReader`, for example, :class:`.Pheno` or :class:`.SnpData`.
-           If you give a string, it should be the file name of a PLINK phenotype-formatted file.
-           Any IIDs missing values will be removed.
-           (For backwards compatibility can also be dictionary with keys 'vals', 'iid', 'header')
-    :type pheno: a :class:`.SnpReader` or a string
-
-    :param K0: SNP data for creating a similarity matrix with each chromosome removed. If not given, will use test_snps.
-          If you give a string, it should be the base name of a set of PLINK Bed-formatted files.
-    :type K0: a class:`.SnpReader` or a string
-
-    :param K1: SNP data for creating a similarity matrix with each chromosome removed. (Also, see 'mixing').
-          If you give a string, it should be the base name of a set of PLINK Bed-formatted files.
-    :type K1: a class:`.SnpReader` or a string
-
-    :param mixing: Weight between 0.0 (inclusive, default) and 1.0 (inclusive) given to K1 relative to K0.
-            If you give no mixing number and a K1 is given, the best weight will be learned.
-    :type mixing: number
-
-    :param covar: covariate information, optional: Can be any :class:`.SnpReader`, for example, :class:`.Pheno` or :class:`.SnpData`.
-           If you give a string, it should be the file name of a PLINK phenotype-formatted file.
-           (For backwards compatibility can also be dictionary with keys 'vals', 'iid', 'header')
-    :type covar: a :class:`.SnpReader` or a string
-
-    :param output_file_name: Name of file to write results to, optional. If not given, no output file will be created.
-    :type output_file_name: file name
-
-    :param h2: A parameter to LMM learning, optional
-            If not given will search for best value.
-            If mixing is unspecified, then h2 must also be unspecified.
-    :type h2: number
-
-    :param log_delta: a re-parameterization of h2 provided for backwards compatibility.
-    :type log_delta: number
-
-    :param GB_goal: gigabytes of memory the run should use, optional. If not given, will read the test_snps in blocks the same size as the kernel,
-        which is memory efficient with little overhead on computation time.
-    :type GB_goal: number
-
-    :param interact_with_snp: index of a covariate to perform an interaction test with. 
-            Allows for interaction testing (interact_with_snp x snp will be tested)
-            default: None
-
-    :param force_full_rank: Even if kernels are defined with fewer SNPs than IIDs, create an explicit iid_count x iid_count kernel. Cannot be True if force_low_rank is True.
-    :type force_full_rank: Boolean
-
-    :param force_low_rank: Even if kernels are defined with fewer IIDs than SNPs, create a low-rank iid_count x sid_count kernel. Cannot be True if force_full_rank is True.
-    :type force_low_rank: Boolean
-
-    :param G0: Same as K0. Provided for backwards compatibility. Cannot be given if K0 is given.
-    :type G0: a :class:`.SnpReader` or a string
-
-    :param G1: Same as K1. Provided for backwards compatibility. Cannot be given if K1 is given.
-    :type G1: a :class:`.SnpReader` or a string
-
-    :param runner: a runner, optional: Tells how to run locally, multi-processor, or on a cluster.
-        If not given, the function is run locally.
-    :type runner: a runner.
-
-    :rtype: Pandas dataframe with one row per test SNP. Columns include "PValue"
-
-    :Example:
-
-    >>> import logging
-    >>> import numpy as np
-    >>> from fastlmm.association import single_snp_leave_out_one_chrom
-    >>> from pysnptools.snpreader import Bed
-    >>> logging.basicConfig(level=logging.INFO)
-    >>> pheno_fn = "../feature_selection/examples/toydata.phe"
-    >>> results_dataframe = single_snp_leave_out_one_chrom(test_snps="../feature_selection/examples/toydata.5chrom", pheno=pheno_fn, h2=.2)
-    >>> print results_dataframe.iloc[0].SNP,round(results_dataframe.iloc[0].PValue,7),len(results_dataframe)
-    null_576 1e-07 10000
-
+    .. deprecated:: 0.2.22
+       Use :meth:`single_snp` instead.
+    
     """
-    t0 = time.time()
-    runner = runner or Local()
-    if force_full_rank and force_low_rank:
-        raise Exception("Can't force both full rank and low rank")
-
-    test_snps, pheno, covar = _fixup_three(test_snps, pheno, covar)
-
-    chrom_list = list(set(test_snps.pos[:,0])) # find the set of all chroms mentioned in test_snps, the main testing data
-    assert len(chrom_list) > 1, "single_leave_out_one_chrom requires more than one chromosome"
-
-    input_files = [test_snps, pheno, K0, G0, K1, G1, covar] + ([] if covar_by_chrom is None else covar_by_chrom.values())
-
-    def nested_closure(chrom):
-        test_snps_chrom = test_snps[:,test_snps.pos[:,0]==chrom]
-        covar_chrom = _create_covar_chrom(covar, covar_by_chrom, chrom)
-
-        K0_chrom = _K_per_chrom(K0 or G0 or test_snps, chrom, test_snps.iid)
-        K1_chrom = _K_per_chrom(K1 or G1, chrom, test_snps.iid)
-
-        K0_chrom, K1_chrom, test_snps_chrom, pheno_chrom, covar_chrom  = pstutil.intersect_apply([K0_chrom, K1_chrom, test_snps_chrom, pheno, covar_chrom])
-        logging.debug("# of iids now {0}".format(K0_chrom.iid_count))
-        K0_chrom, K1_chrom, block_size = _set_block_size(test_snps_chrom, K0_chrom, K1_chrom, mixing, GB_goal, force_full_rank, force_low_rank)
-
-        distributable = _internal_single(K0=K0_chrom, test_snps=test_snps_chrom, pheno=pheno_chrom,
-                                    covar=covar_chrom, K1=K1_chrom,
-                                    mixing=mixing, h2=h2, log_delta=log_delta, cache_file=None,
-                                    force_full_rank=force_full_rank,force_low_rank=force_low_rank,
-                                    output_file_name=None, block_size=block_size, interact_with_snp=interact_with_snp,
-                                    runner=Local())
-            
-        return distributable
-
-    def reducer_closure(frame_sequence):
-        frame = pd.concat(frame_sequence)
-        frame.sort_values(by="PValue", inplace=True)
-        frame.index = np.arange(len(frame))
-        if output_file_name is not None:
-            frame.to_csv(output_file_name, sep="\t", index=False)
-        logging.info("PhenotypeName\t{0}".format(pheno.sid[0]))
-        logging.info("SampleSize\t{0}".format(test_snps.iid_count))
-        logging.info("SNPCount\t{0}".format(test_snps.sid_count))
-        logging.info("Runtime\t{0}".format(time.time()-t0))
-
-        return frame
-
-    frame = map_reduce(chrom_list,
-               mapper = nested_closure,
-               reducer = reducer_closure,
-               input_files = input_files,
-               output_files = [output_file_name],
-               name = "single_snp_leave_out_one_chrom, out='{0}'".format(output_file_name),
-               runner = runner)
-
-    return frame
+    warnings.warn("'single_snp_leave_out_one_chrom' is deprecated. Use 'single_snp(...) instead.", DeprecationWarning)
+    kwargs['leave_out_one_chrom'] = True
+    return single_snp(*args, **kwargs)
 
 def _K_per_chrom(K, chrom, iid):
     if K is None:
