@@ -66,7 +66,7 @@ def single_snp(test_snps, pheno, K0=None,
     :type covar: a :class:`.SnpReader` or a string
 
     :param leave_out_one_chrom: Perform single SNP GWAS via cross validation over the chromosomes. Default to True.
-           (Warning: setting True can cause proximal contamination.)
+           (Warning: setting False can cause proximal contamination.)
     :type leave_out_one_chrom: boolean
     
 
@@ -105,10 +105,10 @@ def single_snp(test_snps, pheno, K0=None,
     :type force_low_rank: Boolean
 
     :param G0: Same as K0. Provided for backwards compatibility. Cannot be given if K0 is given.
-    :type G0: a :class:`.KernelReader` or :class:`.SnpReader` or a string
+    :type G0: :class:`.SnpReader` or a string (or :class:`.KernelReader`)
 
     :param G1: Same as K1. Provided for backwards compatibility. Cannot be given if K1 is given.
-    :type G1: a :class:`.KernelReader` or :class:`.SnpReader` or a string
+    :type G1: :class:`.SnpReader` or a string (or :class:`.KernelReader`)
 
     :param runner: a runner, optional: Tells how to run locally, multi-processor, or on a cluster.
         If not given, the function is run locally.
@@ -252,7 +252,6 @@ def single_snp_leave_out_one_chrom(*args, **kwargs):
     
     """
     warnings.warn("'single_snp_leave_out_one_chrom' is deprecated. Use 'single_snp(...) instead.", DeprecationWarning)
-    kwargs['leave_out_one_chrom'] = True
     return single_snp(*args, **kwargs)
 
 def _K_per_chrom(K, chrom, iid):

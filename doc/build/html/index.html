@@ -124,8 +124,9 @@ If not given, the function is run locally.</li>
 <h2><code class="xref py py-mod docutils literal"><span class="pre">single_snp</span></code><a class="headerlink" href="#single-snp" title="Permalink to this headline">¶</a></h2>
 <dl class="function">
 <dt id="fastlmm.association.single_snp">
-<code class="descclassname">fastlmm.association.</code><code class="descname">single_snp</code><span class="sig-paren">(</span><em>test_snps</em>, <em>pheno</em>, <em>K0=None</em>, <em>K1=None</em>, <em>mixing=None</em>, <em>covar=None</em>, <em>covar_by_chrom=None</em>, <em>leave_out_one_chrom=False</em>, <em>output_file_name=None</em>, <em>h2=None</em>, <em>log_delta=None</em>, <em>cache_file=None</em>, <em>GB_goal=None</em>, <em>interact_with_snp=None</em>, <em>force_full_rank=False</em>, <em>force_low_rank=False</em>, <em>G0=None</em>, <em>G1=None</em>, <em>runner=None</em><span class="sig-paren">)</span><a class="headerlink" href="#fastlmm.association.single_snp" title="Permalink to this definition">¶</a></dt>
-<dd><p>Function performing single SNP GWAS with REML. Use &#8216;leave_out_one_chrom=True&#8217; to perform cross validation over the chromosomes. Will reorder and intersect IIDs as needed.</p>
+<code class="descclassname">fastlmm.association.</code><code class="descname">single_snp</code><span class="sig-paren">(</span><em>test_snps</em>, <em>pheno</em>, <em>K0=None</em>, <em>K1=None</em>, <em>mixing=None</em>, <em>covar=None</em>, <em>covar_by_chrom=None</em>, <em>leave_out_one_chrom=True</em>, <em>output_file_name=None</em>, <em>h2=None</em>, <em>log_delta=None</em>, <em>cache_file=None</em>, <em>GB_goal=None</em>, <em>interact_with_snp=None</em>, <em>force_full_rank=False</em>, <em>force_low_rank=False</em>, <em>G0=None</em>, <em>G1=None</em>, <em>runner=None</em><span class="sig-paren">)</span><a class="headerlink" href="#fastlmm.association.single_snp" title="Permalink to this definition">¶</a></dt>
+<dd><p>Function performing single SNP GWAS using cross validation over the chromosomes and REML. Will reorder and intersect IIDs as needed.
+(For backwards compatibility, you may use &#8216;leave_out_one_chrom=False&#8217; to skip cross validation, but that is not recommended.)</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -137,21 +138,19 @@ If not given, the function is run locally.</li>
 If you give a string, it should be the file name of a PLINK phenotype-formatted file.
 Any IIDs with missing values will be removed.
 (For backwards compatibility can also be dictionary with keys &#8216;vals&#8217;, &#8216;iid&#8217;, &#8216;header&#8217;)</li>
-<li><strong>K0</strong> (a <code class="xref py py-class docutils literal"><span class="pre">KernelReader</span></code> or <code class="xref py py-class docutils literal"><span class="pre">SnpReader</span></code> or a string) &#8211; A similarity matrix. If not given, will use test_snps.
-If a <code class="xref py py-class docutils literal"><span class="pre">SnpReader</span></code> is given, the similarity matrix will be created from the SNP values.
-If you give a string, it should be the name of a <code class="xref py py-class docutils literal"><span class="pre">KernelNpz</span></code> file or base name of a set of PLINK Bed-formatted files.
-When leave_out_one_chrom is True, must be the name of a Bed-formated file, a <code class="xref py py-class docutils literal"><span class="pre">SnpReader</span></code> or <code class="xref py py-class docutils literal"><span class="pre">SnpKernel</span></code>.</li>
-<li><strong>K1</strong> (a <code class="xref py py-class docutils literal"><span class="pre">KernelReader</span></code> or <code class="xref py py-class docutils literal"><span class="pre">SnpReader</span></code> or a string) &#8211; A second similarity kernel, optional. (Also, see &#8216;mixing&#8217;).
-If a <code class="xref py py-class docutils literal"><span class="pre">SnpReader</span></code> is given, the similarity matrix will be created from the SNP values.
-If you give a string, it should be the name of a <code class="xref py py-class docutils literal"><span class="pre">KernelNpz</span></code> file or base name of a set of PLINK Bed-formatted files.
-When leave_out_one_chrom is True, must be the name of a Bed-formated file, a <code class="xref py py-class docutils literal"><span class="pre">SnpReader</span></code> or <code class="xref py py-class docutils literal"><span class="pre">SnpKernel</span></code>.</li>
+<li><strong>K0</strong> (<code class="xref py py-class docutils literal"><span class="pre">SnpReader</span></code> or a string (or <code class="xref py py-class docutils literal"><span class="pre">KernelReader</span></code>)) &#8211; SNPs from which to create a similarity matrix. If not given, will use test_snps.
+Can be any <code class="xref py py-class docutils literal"><span class="pre">SnpReader</span></code>. If you give a string, it should be the base name of a set of PLINK Bed-formatted files.
+(When leave_out_one_chrom is False, can be a <code class="xref py py-class docutils literal"><span class="pre">KernelReader</span></code> or a <code class="xref py py-class docutils literal"><span class="pre">KernelNpz</span></code>-formated file name.)</li>
+<li><strong>K1</strong> (<code class="xref py py-class docutils literal"><span class="pre">SnpReader</span></code> or a string (or <code class="xref py py-class docutils literal"><span class="pre">KernelReader</span></code>)) &#8211; SNPs from which to create a second similarity matrix, optional. (Also, see &#8216;mixing&#8217;).
+Can be any <code class="xref py py-class docutils literal"><span class="pre">SnpReader</span></code>. If you give a string, it should be the base name of a set of PLINK Bed-formatted files.
+(When leave_out_one_chrom is False, can be a <code class="xref py py-class docutils literal"><span class="pre">KernelReader</span></code> or a <code class="xref py py-class docutils literal"><span class="pre">KernelNpz</span></code>-formated file name.)</li>
 <li><strong>mixing</strong> (<em>number</em>) &#8211; Weight between 0.0 (inclusive, default) and 1.0 (inclusive) given to K1 relative to K0.
 If you give no mixing number and a K1 is given, the best weight will be learned.</li>
 <li><strong>covar</strong> (a <code class="xref py py-class docutils literal"><span class="pre">SnpReader</span></code> or a string) &#8211; covariate information, optional: Can be any <code class="xref py py-class docutils literal"><span class="pre">SnpReader</span></code>, for example, <code class="xref py py-class docutils literal"><span class="pre">Pheno</span></code> or <code class="xref py py-class docutils literal"><span class="pre">SnpData</span></code>.
 If you give a string, it should be the file name of a PLINK phenotype-formatted file.
 (For backwards compatibility can also be dictionary with keys &#8216;vals&#8217;, &#8216;iid&#8217;, &#8216;header&#8217;)</li>
-<li><strong>covar_by_chrom</strong> (<em>Dictionary</em>) &#8211; A dictionary from chromosome number to covariate information, optional. When leave_out_one_chrom is False, must be None. Will be merged with &#8216;covar&#8217;.</li>
-<li><strong>leave_out_one_chrom</strong> (<em>boolean</em>) &#8211; Perform single SNP GWAS via cross validation over the chromosomes. Default to False.</li>
+<li><strong>leave_out_one_chrom</strong> (<em>boolean</em>) &#8211; Perform single SNP GWAS via cross validation over the chromosomes. Default to True.
+(Warning: setting False can cause proximal contamination.)</li>
 <li><strong>output_file_name</strong> (<em>file name</em>) &#8211; Name of file to write results to, optional. If not given, no output file will be created.</li>
 <li><strong>h2</strong> (<em>number</em>) &#8211; A parameter to LMM learning, optional
 If not given will search for best value.
@@ -159,8 +158,8 @@ If mixing is unspecified, then h2 must also be unspecified.</li>
 <li><strong>log_delta</strong> (<em>number</em>) &#8211; a re-parameterization of h2 provided for backwards compatibility. h2 is 1./(exp(log_delta)+1)</li>
 <li><strong>cache_file</strong> (<em>file name</em>) &#8211; Name of  file to read or write cached precomputation values to, optional.
 If not given, no cache file will be used.
-If given and file does not exists, will write precomputation values to file.
-If given and file does exists, will read precomputation values from file.
+If given and file does not exist, will write precomputation values to file.
+If given and file does exist, will read precomputation values from file.
 The file contains the U and S matrix from the decomposition of the training matrix. It is in Python&#8217;s np.savez (<a href="#id3"><span class="problematic" id="id4">*</span></a>.npz) format.
 Calls using the same cache file should have the same &#8216;K0&#8217; and &#8216;K1&#8217;
 If given and the file does exist then K0 and K1 need not be given.</li>
@@ -171,8 +170,8 @@ Allows for interaction testing (interact_with_snp x snp will be tested)
 default: None</li>
 <li><strong>force_full_rank</strong> (<em>Boolean</em>) &#8211; Even if kernels are defined with fewer SNPs than IIDs, create an explicit iid_count x iid_count kernel. Cannot be True if force_low_rank is True.</li>
 <li><strong>force_low_rank</strong> (<em>Boolean</em>) &#8211; Even if kernels are defined with fewer IIDs than SNPs, create a low-rank iid_count x sid_count kernel. Cannot be True if force_full_rank is True.</li>
-<li><strong>G0</strong> (a <code class="xref py py-class docutils literal"><span class="pre">KernelReader</span></code> or <code class="xref py py-class docutils literal"><span class="pre">SnpReader</span></code> or a string) &#8211; Same as K0. Provided for backwards compatibility. Cannot be given if K0 is given.</li>
-<li><strong>G1</strong> (a <code class="xref py py-class docutils literal"><span class="pre">KernelReader</span></code> or <code class="xref py py-class docutils literal"><span class="pre">SnpReader</span></code> or a string) &#8211; Same as K1. Provided for backwards compatibility. Cannot be given if K1 is given.</li>
+<li><strong>G0</strong> (<code class="xref py py-class docutils literal"><span class="pre">SnpReader</span></code> or a string (or <code class="xref py py-class docutils literal"><span class="pre">KernelReader</span></code>)) &#8211; Same as K0. Provided for backwards compatibility. Cannot be given if K0 is given.</li>
+<li><strong>G1</strong> (<code class="xref py py-class docutils literal"><span class="pre">SnpReader</span></code> or a string (or <code class="xref py py-class docutils literal"><span class="pre">KernelReader</span></code>)) &#8211; Same as K1. Provided for backwards compatibility. Cannot be given if K1 is given.</li>
 <li><strong>runner</strong> (<em>a runner.</em>) &#8211; a runner, optional: Tells how to run locally, multi-processor, or on a cluster.
 If not given, the function is run locally.</li>
 </ul>
@@ -192,13 +191,7 @@ If not given, the function is run locally.</li>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">snpreader</span> <span class="o">=</span> <span class="n">Bed</span><span class="p">(</span><span class="s">&quot;../feature_selection/examples/toydata&quot;</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">pheno_fn</span> <span class="o">=</span> <span class="s">&quot;../feature_selection/examples/toydata.phe&quot;</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">results_dataframe</span> <span class="o">=</span> <span class="n">single_snp</span><span class="p">(</span><span class="n">test_snps</span><span class="o">=</span><span class="n">snpreader</span><span class="p">[:,</span><span class="mi">5000</span><span class="p">:</span><span class="mi">10000</span><span class="p">],</span><span class="n">pheno</span><span class="o">=</span><span class="n">pheno_fn</span><span class="p">,</span><span class="n">K0</span><span class="o">=</span><span class="n">snpreader</span><span class="p">[:,</span><span class="mi">0</span><span class="p">:</span><span class="mi">5000</span><span class="p">],</span><span class="n">h2</span><span class="o">=.</span><span class="mi">2</span><span class="p">,</span><span class="n">mixing</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">results_dataframe</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">SNP</span><span class="p">,</span><span class="nb">round</span><span class="p">(</span><span class="n">results_dataframe</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">PValue</span><span class="p">,</span><span class="mi">7</span><span class="p">),</span><span class="nb">len</span><span class="p">(</span><span class="n">results_dataframe</span><span class="p">)</span>
-<span class="go">null_7487 3.4e-06 5000</span>
-</pre></div>
-</div>
-<p>Using &#8216;leave_out_one_chrom=True&#8217; to perform cross validation over chromosomes.</p>
-<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">results_dataframe</span> <span class="o">=</span> <span class="n">single_snp</span><span class="p">(</span><span class="n">test_snps</span><span class="o">=</span><span class="s">&quot;../feature_selection/examples/toydata.5chrom&quot;</span><span class="p">,</span> <span class="n">pheno</span><span class="o">=</span><span class="n">pheno_fn</span><span class="p">,</span> <span class="n">leave_out_one_chrom</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">h2</span><span class="o">=.</span><span class="mi">2</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">results_dataframe</span> <span class="o">=</span> <span class="n">single_snp</span><span class="p">(</span><span class="n">test_snps</span><span class="o">=</span><span class="s">&quot;../feature_selection/examples/toydata.5chrom&quot;</span><span class="p">,</span> <span class="n">pheno</span><span class="o">=</span><span class="n">pheno_fn</span><span class="p">,</span> <span class="n">h2</span><span class="o">=.</span><span class="mi">2</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">results_dataframe</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">SNP</span><span class="p">,</span><span class="nb">round</span><span class="p">(</span><span class="n">results_dataframe</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">PValue</span><span class="p">,</span><span class="mi">7</span><span class="p">),</span><span class="nb">len</span><span class="p">(</span><span class="n">results_dataframe</span><span class="p">)</span>
 <span class="go">null_576 1e-07 10000</span>
 </pre></div>
@@ -212,7 +205,7 @@ If not given, the function is run locally.</li>
 <dt id="fastlmm.association.single_snp_leave_out_one_chrom">
 <code class="descclassname">fastlmm.association.</code><code class="descname">single_snp_leave_out_one_chrom</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#fastlmm.association.single_snp_leave_out_one_chrom" title="Permalink to this definition">¶</a></dt>
 <dd><div class="deprecated">
-<p><span class="versionmodified">Deprecated since version 0.2.22: </span>Use <code class="xref py py-meth docutils literal"><span class="pre">single_snp()</span></code> with leave_out_one_chrom=True instead.</p>
+<p><span class="versionmodified">Deprecated since version 0.2.22: </span>Use <code class="xref py py-meth docutils literal"><span class="pre">single_snp()</span></code> instead.</p>
 </div>
 </dd></dl>
 
