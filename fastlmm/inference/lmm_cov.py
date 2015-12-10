@@ -559,14 +559,6 @@ class LMM(object):
 		denom = (1.0 - h2 - h2_1) * scale      # determine normalization factor
 		if subset: #if G1 is a complete subset of G, then we don't need to subtract and add separately
 			h2_1 = h2_1 - h2
-
-		#UY,UUY = self.getUY()
-		#YKY = computeAKA(Sd=Sd, denom=denom, UA=UY, UUA=UUY)
-		#logdetK = np.log(Sd).sum()
-		#
-		#if (UUY is not None):#low rank part
-		#    logdetK+=(N-k) * np.log(denom)
-        
 		if UW is not None:
 			weightW = np.zeros(UW.shape[1])
 			weightW[i_up] = -h2
@@ -576,12 +568,10 @@ class LMM(object):
 
 		Usnps,UUsnps = None,None
 		if snps is not None:
-            
 			if snps.shape[0] != self.Y.shape[0]:
 				#pdb.set_trace()
 				print "shape mismatch between snps and Y"
 			Usnps,UUsnps = self.rotate(A=snps)
-                
 		result = self.nLLcore(Sd=Sd, dof=dof, scale=scale, penalty=penalty, UW=UW, UUW=UUW, weightW=weightW, denom=denom, Usnps=Usnps, UUsnps=UUsnps)
 		result['h2'] = h2
 		result['h2_1'] = h2_1
@@ -664,11 +654,6 @@ class LMM(object):
 					'scale':scale}
 		UY,UUY = self.getUY(idx_pheno = idx_pheno)
 		P = UY.shape[1]	#number of phenotypes used
-		#YKY = computeAKA(Sd=Sd, denom=denom, UA=UY, UUA=UUY)
-		#logdetK = np.log(Sd).sum()
-
-		if (UUY is not None):#low rank part
-			logdetK+=(N - k) * np.log(denom)
 
 		if (snps is not None) and (Usnps is None):
 			assert snps.shape[0] == self.Y.shape[0], "shape missmatch between snps and Y"
