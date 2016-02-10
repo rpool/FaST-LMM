@@ -6,7 +6,7 @@ See SamplePi.py for examples.
 
 from fastlmm.util.runner import *
 import os
-import cPickle as pickle
+import pickle as pickle
 import subprocess, sys, os.path
 import multiprocessing
 import fastlmm.util.util as util
@@ -321,7 +321,7 @@ class HPCCopier(object): #Implements ICopier
             xcopycommand = "xcopy /d /e /s /c /h /y {0} {1}".format(itemnorm, remote_dir_name)
             logging.info(xcopycommand)
             rc = os.system(xcopycommand)
-            print "rc=" +str(rc)
+            print("rc=" +str(rc))
             if rc!=0: raise Exception("xcopy cmd failed with return value={0}, from cmd {1}".format(rc,xcopycommand))
         elif hasattr(item,"copyinputs"):
             item.copyinputs(self)
