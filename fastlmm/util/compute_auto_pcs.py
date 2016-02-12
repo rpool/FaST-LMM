@@ -119,7 +119,7 @@ def compute_auto_pcs(snpreader, cutoff=.1, k_values=np.arange(11), output_file_n
                 f.write(' '.join([str(pc) for pc in X_fit[iid_index, :]]))
                 f.write('\n')
 
-    result = {'iid':sp.array(snpreader.iid),'vals':X_fit}
+    result = {'iid':sp.array(snpreader.iid),'vals':X_fit, 'header':["pc_{0}".format(index) for index in xrange(bestNumPCs)]}
     return result
 
 def _snp_fixup(snp_input):

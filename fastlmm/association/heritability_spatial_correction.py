@@ -92,7 +92,7 @@ def work_item(arg_tuple):
         new_index = np.arange(G_kernel.iid_count)
         np.random.shuffle(new_index)
         E_kernel_temp = E_kernel[new_index].read()
-        E_kernel = KernelData(iid=E_kernel.iid,val=E_kernel_temp.val,parent_string="permutation {0}".format(permute_plus_index))
+        E_kernel = KernelData(iid=E_kernel.iid,val=E_kernel_temp.val,name="permutation {0}".format(permute_plus_index))
 
     pheno = pheno.read().standardize()       # defaults to Unit standardize
     G_kernel = G_kernel.read().standardize() # defaults to DiagKtoN standardize
@@ -147,7 +147,7 @@ def work_item(arg_tuple):
     else:
         #Create the G+E kernel by mixing according to a2
         val=(1-a2)*G_kernel.val + a2*E_kernel.val
-        GplusE_kernel = KernelData(iid=G_kernel.iid, val=val,parent_string="{0} G + {1} E".format(1-a2,a2))
+        GplusE_kernel = KernelData(iid=G_kernel.iid, val=val,name="{0} G + {1} E".format(1-a2,a2))
         #Don't need to standardize GplusE_kernel because it's the weighted combination of standardized kernels
 
         # Create GxE Kernel and then find the best mixing of it and GplusE
@@ -161,7 +161,7 @@ def work_item(arg_tuple):
             np.random.shuffle(new_index)
             val = pstutil.sub_matrix(val, new_index, new_index)
 
-        GxE_kernel = KernelData(iid=G_kernel.iid, val=val,parent_string="GxE") # recall that Python '*' is just element-wise multiplication
+        GxE_kernel = KernelData(iid=G_kernel.iid, val=val,name="GxE") # recall that Python '*' is just element-wise multiplication
         GxE_kernel = GxE_kernel.standardize()
 
         lmm2 = LMM()
@@ -256,7 +256,7 @@ def heritability_spatial_correction(G_kernel, spatial_coor, spatial_iid, alpha_l
     # Prepare the inputs
     ######################
 
-    from fastlmm.association.fastlmmmodel import _kernel_fixup, _pheno_fixup
+    from fastlmm.inference.fastlmm_predictor import _kernel_fixup, _pheno_fixup
     G_kernel = _kernel_fixup(G_kernel, iid_if_none=None, standardizer=Unit())  # Create a kernel from an in-memory kernel, some snps, or a text file.
     pheno = _pheno_fixup(pheno,iid_if_none=G_kernel.iid, missing='NA') # Create phenotype data from in-memory data or a text file.
 

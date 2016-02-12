@@ -35,6 +35,7 @@ def run_all_in_memory(work):
     if callable(work):
         return work()
     else:
+        assert hasattr(work,"work_sequence"), "Your work item doesn't have a work_sequence. This can be caused by having 'map_reduce(nested=something,...)' where you should have 'map_reduce(mapper=something,...)' because the 'something' is not a nested 'map_reduce'"
         work_sequence = work.work_sequence()
         result_sequence = work_sequence_to_result_sequence(work_sequence)
         return work.reduce(result_sequence)
@@ -74,7 +75,7 @@ def run_one_task(original_distributable, taskindex, taskcount, workdirectory):
 
     if shaped_distributable.work_count != taskcount : raise Exception("Assert: expect workcount == taskcount")
 
-    util.create_directory_if_necessary(workdirectory, isfile=False)
+    util.create_directory_if_necessary(workdirectory, isfile=False, robust=True)
 
     if (taskindex < taskcount):
         doMainWorkForOneIndex(shaped_distributable, taskcount, taskindex, workdirectory)
@@ -352,7 +353,7 @@ class ExpandWork(object): # implements IDistributable
         if workIndex != self._workcount : raise Exception("Assert: expect len(result_sequence) to match workcount")
         try:
             result_sequence.next() #should get an StopIternation here, which will be ignored.
-            raise Exception("Assert: expect len(result_sequence) to match workcount")
+            raise Exception("Assert: expect len(result_sequence) to match workcount. This can be caused by a 'reducer' that doesn't pull every input from its input sequence.")
         except StopIteration:
             pass #do nothing
 

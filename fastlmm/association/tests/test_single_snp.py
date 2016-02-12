@@ -6,13 +6,14 @@ import doctest
 import pandas as pd
 
 from fastlmm.association import single_snp
+from fastlmm.association import single_snp_linreg
 import pysnptools.util.pheno as pstpheno
 from fastlmm.feature_selection.test import TestFeatureSelection
 from fastlmm.util.runner import Local, HPC, LocalMultiProc
 from pysnptools.kernelreader import  Identity as KernelIdentity
-from pysnptools.kernelreader import SnpKernel
 from pysnptools.standardizer import Unit
 from pysnptools.snpreader import Bed, Pheno, SnpData
+from pysnptools.kernelreader import SnpKernel
 
 
 class TestSingleSnp(unittest.TestCase):
@@ -121,6 +122,28 @@ class TestSingleSnp(unittest.TestCase):
                                   )
 
         self.compare_files(frame,"one")
+
+    def test_linreg(self):
+        logging.info("TestSingleSnp test_linreg")
+        test_snps = Bed(self.bedbase)
+        pheno = self.phen_fn
+        covar = self.cov_fn
+
+        output_file = self.file_name("linreg")
+
+        frame1 = single_snp(test_snps=test_snps[:,:10], pheno=pheno, mixing=0,leave_out_one_chrom=False,
+                                    G0=KernelIdentity(iid=test_snps.iid), covar=covar, 
+                                    output_file_name=output_file
+                                    )
+
+        frame1 = frame1[['sid_index', 'SNP', 'Chr', 'GenDist', 'ChrPos', 'PValue']]
+        self.compare_files(frame1,"linreg")
+
+        frame2 = single_snp_linreg(test_snps=test_snps[:,:10], pheno=pheno, 
+                                    covar=covar, 
+                                    output_file_name=output_file
+                                    )
+        self.compare_files(frame2,"linreg")
 
     def test_noK0(self):
         logging.info("TestSingleSnp test_noK0")
@@ -238,11 +261,17 @@ class TestSingleSnp(unittest.TestCase):
 
         output_file_name = self.file_name("G0_has_reader")
 
-        frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno, G0=test_snps, leave_out_one_chrom=False,
+        frame0 = single_snp(test_snps=test_snps[:,:10], pheno=pheno, G0=test_snps, leave_out_one_chrom=False,
                                   covar=covar, mixing=0,
                                   output_file_name=output_file_name
                                   )
-        self.compare_files(frame,"one")
+        self.compare_files(frame0,"one")
+
+        frame1 = single_snp(test_snps=test_snps[:,:10], pheno=pheno, G0=KernelIdentity(test_snps.iid), G1=test_snps, leave_out_one_chrom=False,
+                                  covar=covar, mixing=1,
+                                  output_file_name=output_file_name
+                                  )
+        self.compare_files(frame1,"one")
 
     def test_no_cov(self):
         logging.info("TestSingleSnp test_no_cov")
@@ -280,7 +309,8 @@ class TestSingleSnp(unittest.TestCase):
         covar = self.cov_fn
 
         output_file_name = self.file_name("G1")
-        for force_full_rank,force_low_rank in [(False,False),(True,False),(False,True)]:
+        for force_full_rank,force_low_rank in [(False,True),(False,False),(True,False)]:
+            logging.info("{0},{1}".format(force_full_rank,force_low_rank))
             frame = single_snp(test_snps=test_snps[:,:10], pheno=pheno,G0=test_snps[:,10:100], leave_out_one_chrom=False,
                                           covar=covar, G1=test_snps[:,100:200],
                                           mixing=.5,force_full_rank=force_full_rank,force_low_rank=force_low_rank,
@@ -372,7 +402,7 @@ class TestSingleSnp(unittest.TestCase):
         #for index, sid in enumerate(sid_list):
         #    sid_to_pvalue[sid] = pvalue_list[index]
 
-        reference=pd.read_csv(reffile,delimiter='\s',comment=None)
+        reference=pd.read_csv(reffile,delimiter='\s',comment=None,engine='python')
         assert len(frame) == len(reference), "# of pairs differs from file '{0}'".format(reffile)
         for _, row in reference.iterrows():
             sid = row.SNP
@@ -475,7 +505,7 @@ class TestSingleSnpLeaveOutOneChrom(unittest.TestCase):
         #for index, sid in enumerate(sid_list):
         #    sid_to_pvalue[sid] = pvalue_list[index]
 
-        reference=pd.read_csv(reffile,delimiter='\s',comment=None)
+        reference=pd.read_csv(reffile,delimiter='\s',comment=None,engine='python')
         assert len(frame) == len(reference), "# of pairs differs from file '{0}'".format(reffile)
         frame.set_index('SNP',inplace=True)
         reference.set_index('SNP',inplace=True)
@@ -503,7 +533,7 @@ if __name__ == '__main__':
     suites = unittest.TestSuite([getTestSuite()])
 
     if True: #Standard test run
-        r = unittest.TextTestRunner(failfast=True) #!!!cmk
+        r = unittest.TextTestRunner(failfast=False)
         r.run(suites)
     else: #Cluster test run
         logging.basicConfig(level=logging.INFO)

@@ -8,6 +8,7 @@ import sys
 import matplotlib
 matplotlib.use('Agg') #This lets it work even on machines without graphics displays
 import matplotlib.pyplot as plt
+import time
 
 def thin_results_file(myfile,dup_postfix="v2"):
     '''
@@ -309,7 +310,7 @@ def datestamp(appendrandom=False):
 #        index += 1
 #        yield item, index
 
-def create_directory_if_necessary(name, isfile=True):    
+def create_directory_if_necessary(name, isfile=True, robust=False):
     import os
     if isfile:
         directory_name = os.path.dirname(name)
@@ -317,11 +318,29 @@ def create_directory_if_necessary(name, isfile=True):
         directory_name = name
 
     if directory_name != "":
-        try:
-            os.makedirs(directory_name)
-        except OSError, e:
-            if not os.path.isdir(directory_name):
+        if not robust:
+            try:
+                os.makedirs(directory_name)
+            except OSError, e:
+                if not os.path.isdir(directory_name):
+                    raise Exception("not valid path: '{0}'. (Working directory is '{1}'".format(directory_name,os.getcwd()))
+        else:
+            is_ok = False
+            for i in xrange(10):
+                try:
+                    os.makedirs(directory_name)
+                    is_ok = True
+                    break
+                except OSError, e:
+                    if not os.path.isdir(directory_name):
+                        warnings.warn("creating directory robust=True, try#{0}, error: not valid path: '{1}'. (Working directory is '{2}'".format(i, directory_name,os.getcwd()))
+                        time.sleep(10) ; #make random?
+                    else:
+                        is_ok = True
+                        break
+            if not is_ok:
                 raise Exception("not valid path: '{0}'. (Working directory is '{1}'".format(directory_name,os.getcwd()))
+
 
 def which(vec):
     '''
@@ -479,12 +498,12 @@ def manhattan_plot(chr_pos_pvalue_array,pvalue_line=None,plot_threshold=1.0,vlin
 
     :Example:
 
-    >>> from fastlmm.association import single_snp_leave_out_one_chrom
+    >>> from fastlmm.association import single_snp
     >>> from pysnptools.snpreader import Bed
     >>> import matplotlib.pyplot as plt
     >>> import fastlmm.util.util as flutil
     >>> pheno_fn = "../feature_selection/examples/toydata.phe"
-    >>> results_dataframe = single_snp_leave_out_one_chrom(test_snps="../feature_selection/examples/toydata.5chrom", pheno=pheno_fn, h2=.2)
+    >>> results_dataframe = single_snp(test_snps="../feature_selection/examples/toydata.5chrom", pheno=pheno_fn, h2=.2)
     >>> chromosome_starts = flutil.manhattan_plot(results_dataframe.as_matrix(["Chr", "ChrPos", "PValue"]),pvalue_line=1e-7)
     >>> #plt.show()
 

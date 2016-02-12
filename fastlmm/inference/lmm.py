@@ -741,24 +741,34 @@ class LMM(object):
         ystar = yfixed + yrandom
         return ystar
 
-    #def predict_mean_and_variance(self, beta, sigma2, h2, Kstar_star):
-    #    assert 0 <= h2 and h2 <= 1, "By definition, h2 must be between 0 and 1 (inclusive)"
-    #    varg = h2 * sigma2
-    #    vare = (1.-h2) * sigma2
-    #    K = np.dot(np.dot(self.U,np.eye(len(self.U)) * self.S),self.U.T) #Re-compose the Eigen value decomposition #!!!don't leave it like this
-    #    V = varg * K + vare * np.eye(len(K))
-    #    Vinv = LA.inv(V)
+    def predict_mean_and_variance(lmm, beta, sigma2, h2, Kstar_star):
+        assert 0 <= h2 and h2 <= 1, "By definition, h2 must be between 0 and 1 (inclusive)"
+        varg = h2 * sigma2
+        vare = (1.-h2) * sigma2
+        if lmm.G is not None:
+            K = np.dot(lmm.G,lmm.G.T) #!!!later this is very inefficient in memory and computation
+        else:
+            K = np.dot(np.dot(lmm.U,np.eye(len(lmm.U)) * lmm.S),lmm.U.T) #Re-compose the Eigen value decomposition #!!!later do this more efficiently
+        V = varg * K + vare * np.eye(len(K))
+        Vinv = LA.inv(V)
 
-    #    a = np.dot(varg * self.Kstar, Vinv)
+        a = np.dot(varg * lmm.Kstar, Vinv)
 
-    #    y_star = np.dot(self.Xstar,beta) + np.dot(a, self.y-SP.dot(self.X,beta)) #!!! shouldn't the 2nd dot be precomputed?
-    #    y_star = y_star.reshape(-1,1) #Make 2-d
+        y_star = np.dot(lmm.Xstar,beta) + np.dot(a, lmm.y-SP.dot(lmm.X,beta)) #!!!later shouldn't the 2nd dot be precomputed?
+        y_star = y_star.reshape(-1,1) #Make 2-d
 
-    #    var_star = (varg * Kstar_star + 
-    #                vare * np.eye(len(Kstar_star)) -
-    #                np.dot(a,
-    #                        (varg * self.Kstar.T)))
-    #    return y_star, var_star
+        var_star = (varg * Kstar_star + 
+                    vare * np.eye(len(Kstar_star)) -
+                    np.dot(a,
+                            (varg * lmm.Kstar.T)))
+        return y_star, var_star
+
+    def nLL(lmm, beta, sigma2, h2, y_actual):
+        from scipy.stats import multivariate_normal
+        y_star, var_star = predict_mean_and_variance(lmm, beta, sigma2, h2, lmm.Kstar_star)
+        var = multivariate_normal(mean=y_star.reshape(-1), cov=var_star)
+        return -np.log(var.pdf(y_actual.reshape(-1)))
+
 
     def predictVariance(self, h2=0.0, logdelta = None, delta = None, sigma2 = 1.0, Kstar_star = None):
         '''

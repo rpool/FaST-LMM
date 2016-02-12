@@ -9,7 +9,11 @@ See SamplePi.py for examples.
 
 
 import os
-import cPickle as pickle
+try:
+    import dill as pickle
+except:
+    logging.warning("Can't import dill, so won't be able to clusterize lambda expressions. If you try, you'll get this error 'Can't pickle <type 'function'>: attribute lookup __builtin__.function failed'")
+    import cPickle as pickle
 import subprocess, sys, os.path
 from fastlmm.util.runner import *
 import logging

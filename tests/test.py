@@ -126,47 +126,69 @@ def removeTmpFiles():
 
 if __name__ == '__main__':
 
-    #from pysnptools.test import getTestSuite as pstTestSuite
-
     logging.basicConfig(level=logging.WARN)
     removeTmpFiles()
 
     import fastlmm.association.tests.testepistasis
     import fastlmm.association.tests.test_single_snp
+    import fastlmm.association.tests.test_single_snp_linreg
+    import fastlmm.association.tests.test_single_snp_select
+    import fastlmm.association.tests.test_single_snp_all_plus_select
     import fastlmm.association.tests.test_snp_set
     import fastlmm.association.tests.test_gwas
     import fastlmm.association.tests.test_heritability_spatial_correction
+    import fastlmm.inference.tests.test_fastlmm_predictor
+    import fastlmm.inference.tests.test_linear_regression
+    import fastlmm.inference.tests.test
     import fastlmm.util.testdistributable
     import fastlmm.util.test
+    import tests.test
 
     suites = unittest.TestSuite([
-                                    #getDebugTestSuite(),\
+                                    ##getDebugTestSuite(),\
 
                                     fastlmm.util.test.getTestSuite(),
-                                    getTestSuite(),
+                                    tests.test.getTestSuite(),
                                     fastlmm.inference.test.getTestSuite(),
                                     fastlmm.association.tests.test_single_snp.getTestSuite(),
+                                    fastlmm.association.tests.test_single_snp_linreg.getTestSuite(),
+                                    fastlmm.association.tests.test_single_snp_all_plus_select.getTestSuite(),
+                                    fastlmm.association.tests.test_single_snp_select.getTestSuite(),
                                     fastlmm.association.tests.testepistasis.getTestSuite(),
                                     fastlmm.association.tests.test_snp_set.getTestSuite(),
-                                    fastlmm.association.tests.test_gwas.getTestSuite(),
+                                    fastlmm.inference.tests.test.getTestSuite(),
+
                                     fastlmm.association.tests.test_gwas.getTestSuite(),
                                     fastlmm.util.testdistributable.getTestSuite(),
                                     fastlmm.feature_selection.test.getTestSuite(),
+                                    fastlmm.association.tests.test_heritability_spatial_correction.getTestSuite(),
+                                    fastlmm.inference.tests.test_fastlmm_predictor.getTestSuite(),
+                                    fastlmm.inference.tests.test_linear_regression.getTestSuite(),
                                     ])
-    suites.debug
-
+    
     if True: #Standard test run
         r = unittest.TextTestRunner(failfast=False)
         r.run(suites)
     else: #Cluster test run
         task_count = 150
-        runner = HPC(task_count, 'RR1-N13-09-H44',r'\\msr-arrays\Scratch\msr-pool\Scratch_Storage6\Redmond',
-                     remote_python_parent=r"\\msr-arrays\Scratch\msr-pool\Scratch_Storage6\REDMOND\carlk\Source\carlk\july_7_14\pythonpath",
-                     update_remote_python_parent=True,
-                     min=150,
-                     priority="AboveNormal",mkl_num_threads=1)
+        remote_python_parent=r"\\GCR\Scratch\RR1\escience\carlk\data\carlk\pythonpath02032016"
+
+        #Because both pysnptools and fastlmm contain a tests folder, to run on cluster must have fastlmm listed first.
+        runner = HPC(task_count, 'GCR',r"\\GCR\Scratch\RR1\escience",
+                                                    remote_python_parent=remote_python_parent,
+                                                    unit='node', #core, socket, node
+                                                    update_remote_python_parent=True,
+                                                    template="Preemptable",
+                                                    priority="Lowest",
+                                                    nodegroups="Preemptable",
+                                                    excluded_nodes=['gcrcn0231'],
+                                                    runtime="0:11:0", # day:hour:min
+                                                    max = 100
+                                                    )
+
+
         #runner = Local()
-        #runner = LocalMultiProc(taskcount=20,mkl_num_threads=5)
+        #runner = LocalMultiProc(taskcount=1,mkl_num_threads=5,just_one_process=True)
         #runner = LocalInParts(1,2,mkl_num_threads=1) # For debugging the cluster runs
         #runner = Hadoop2(100, mapmemory=8*1024, reducememory=8*1024, mkl_num_threads=1, queue="default")
         distributable_test = DistributableTest(suites,"temp_test")

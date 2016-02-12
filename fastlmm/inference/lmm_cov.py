@@ -142,13 +142,13 @@ class LMM(object):
 		"""
 		if self.U is None or self.S is None:
 			if self.K is not None:
-				logging.info("starting 'lmm_cov.setSU_fromK()'")
+				logging.debug("starting 'lmm_cov.setSU_fromK()'")
 				self.setSU_fromK()
-				logging.info("finished 'lmm_cov.setSU_fromK()'")
+				logging.debug("finished 'lmm_cov.setSU_fromK()'")
 			elif self.G is not None:
-				logging.info("starting 'lmm_cov.setSU_fromG()'")
+				logging.debug("starting 'lmm_cov.setSU_fromG()'")
 				self.setSU_fromG()
-				logging.info("finished 'lmm_cov.setSU_fromG()'")
+				logging.debug("finished 'lmm_cov.setSU_fromG()'")
 			else:
 				raise Exception("No Kernel is set. Cannot return U and S.") 
 		return self.S, self.U

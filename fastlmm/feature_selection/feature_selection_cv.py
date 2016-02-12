@@ -639,7 +639,7 @@ class FeatureSelectionStrategy(object):
 
 def f_regression_block_load(fun, snpreader, standardizer, y, ind_idx=None, blocksize=10000, **args):
     """
-    runs f_regression for each block seperately (saves memory).
+    runs f_regression for each block separately (saves memory).
 
     -------------------------
     fun        : method that returns statistics,pval

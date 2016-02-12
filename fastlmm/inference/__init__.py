@@ -1,3 +1,7 @@
+from fastlmm.inference.fastlmm_predictor import FastLMM
+from fastlmm.inference.linear_regression import LinearRegression
+
+
 #from bin2kernel import Bin2Kernel
 #from bin2kernel import makeBin2KernelAsEstimator
 #from bin2kernel import Bin2KernelLaplaceLinearN
