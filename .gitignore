@@ -298,7 +298,6 @@ tests/datasets/synth/deleteme1010.bim
 tests/datasets/synth/deleteme1010.snp.hdf5
 tests/datasets/synth/deleteme1010.snp.npz
 tests/datasets/synth/deleteme1010.txt
-tests/expected-Windows/single_snp_all_plus_select/notebook.txt
 tests/htmlcov/*
 tests/out.txt
 tests/select/auto.snps.txt
