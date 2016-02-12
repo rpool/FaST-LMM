@@ -269,7 +269,7 @@ class FeatureSelectionStrategy(object):
         self.run_once()
 
         # set up splitting strategy
-        kf = ShuffleSplit(len(self.y), n_iter=self.num_folds, indices=False, test_size=self.test_size, random_state=self.random_state)
+        kf = ShuffleSplit(len(self.y), n_iter=self.num_folds, test_size=self.test_size, random_state=self.random_state)
 
         fold_idx = start -1
         for (train_idx, test_idx) in islice(kf,start,stop):
