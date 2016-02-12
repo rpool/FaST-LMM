@@ -62,32 +62,32 @@ def compute_auto_pcs(snpreader, cutoff=.1, k_values=np.arange(11), output_file_n
     from sklearn.cross_validation import KFold
     n_folds = 10
     folds = KFold(nofam_snpreader.sid_count, n_folds = n_folds, shuffle=True, random_state=randomstate)
-    	
+        
     scores = np.zeros((k_values.shape[0],n_folds))
     for i_fold, [train_idx,test_idx] in enumerate(folds):
-    	Utr,Str,Vtr,mean = None, None, None, None
-    	logging.info('test set size: {0}'.format(len(test_idx)))
+        Utr,Str,Vtr,mean = None, None, None, None
+        logging.info('test set size: {0}'.format(len(test_idx)))
 
-    	logging.info('creating X_train for fold {0}'.format(i_fold))
-    	t0 = time.time()
-    	X_train = nofam_snpreader[:,train_idx].read(order='F').val.T#!!would order='C' be faster?
-    	logging.info("done after %.4f seconds" % (time.time() - t0))
+        logging.info('creating X_train for fold {0}'.format(i_fold))
+        t0 = time.time()
+        X_train = nofam_snpreader[:,train_idx].read(order='F').val.T#!!would order='C' be faster?
+        logging.info("done after %.4f seconds" % (time.time() - t0))
 
-    	logging.info('creating X_test for fold {0}'.format(i_fold))
-    	t0 = time.time()
-    	X_test = nofam_snpreader[:,test_idx].read(order='F').val.T
-    	logging.info("done after %.4f seconds" % (time.time() - t0))
+        logging.info('creating X_test for fold {0}'.format(i_fold))
+        t0 = time.time()
+        X_test = nofam_snpreader[:,test_idx].read(order='F').val.T
+        logging.info("done after %.4f seconds" % (time.time() - t0))
 
-    	logging.info('Creating svd')
-    	t0 = time.time()
-    	for i_k, k in enumerate(k_values):
-    		pca = PCA(n_components = k, copy=False)
-    		Utr,Str,Vtr,mean = pca._fit(X_train,Utr,Str,Vtr,mean)
-    		if t0 is not None:
-    		    logging.info("done after %.4f seconds" % (time.time() - t0))
-    		    t0 = None
-    		scores[i_k,i_fold] = pca.score(X_test)
-    		logging.info("{0},{1},{2}".format(i_fold, k, scores[i_k,i_fold]))
+        logging.info('Creating svd')
+        t0 = time.time()
+        for i_k, k in enumerate(k_values):
+            pca = PCA(n_components = k, copy=False)
+            Utr,Str,Vtr,mean = pca._fit(X_train,Utr,Str,Vtr,mean)
+            if t0 is not None:
+                logging.info("done after %.4f seconds" % (time.time() - t0))
+                t0 = None
+            scores[i_k,i_fold] = pca.score(X_test)
+            logging.info("{0},{1},{2}".format(i_fold, k, scores[i_k,i_fold]))
 
     normalizedMean = scores.mean(axis=1)
 

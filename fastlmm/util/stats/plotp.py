@@ -150,7 +150,7 @@ def pairedpvalsplot(dirin,filepattern='*.txt',pnames=pnames(), rownames=rownames
     '''
     Paired p-value plot in -log_10 space among all pairs of files in the directory that match the filepattern.
     Reorders all p-values so that rownames match up between files.
-	Returns list of p-value lists, one per file
+    Returns list of p-value lists, one per file
     '''
     import os.path
     import glob

@@ -99,7 +99,7 @@ class FastLmmSet: # implements IDistributable
                             2 : base-pair distance
         autoselect = True   : Should autoselect to used?
         test="lrt"      :['sc_davies', 'sc_mom', 'sc_liuskat','sc_daviesskat','sc_all','lrt','lrt_up']
-	    nperm = 10       : number of pemutations per test
+        nperm = 10       : number of pemutations per test
         npermabs = None : absolutely number of permutations
         calseed =   : the int that gets added to the random seed 34343 used to generate permutations for lrt null fitting.
         write_lrtperm   : If true, write the lrtperm vector (dictated by calseed) to a file.

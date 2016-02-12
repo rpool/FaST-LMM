@@ -93,8 +93,8 @@ setup(
         "fastlmm/util/stats",
         "fastlmm/util",
         "fastlmm",
-	],
-	package_data={"fastlmm/association" : [
+    ],
+    package_data={"fastlmm/association" : [
                        "Fastlmm_autoselect/FastLmmC.exe",
                        "Fastlmm_autoselect/libiomp5md.dll",
                        "Fastlmm_autoselect/fastlmmc",
@@ -120,7 +120,7 @@ setup(
                        "examples/toydata.snpmajor.hdf5",
                        "examples/toydataTest.phe",
                        "examples/toydataTrain.phe"
-					   ]
+                       ]
                  },
     install_requires = ['scipy>=0.16.0', 'numpy>=1.9.3', 'pandas>=0.16.2','matplotlib>=1.4.3', 'scikit-learn>=0.16.1', 'pysnptools>=0.3.7', 'dill'],
     cmdclass = cmdclass,
