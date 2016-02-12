@@ -26,7 +26,7 @@ from fastlmm.util.mapreduce import map_reduce
 from pysnptools.util import create_directory_if_necessary
 from pysnptools.snpreader import wrap_matrix_subset
 from pysnptools.util.intrangeset import IntRangeSet
-from fastlmm.inference.fastlmm_prediction import _snps_fixup, _pheno_fixup, _kernel_fixup, _SnpTrainTest
+from fastlmm.inference.fastlmm_predictor import _snps_fixup, _pheno_fixup, _kernel_fixup, _SnpTrainTest
 import fastlmm.inference.linear_regression as lin_reg
 from fastlmm.association.single_snp import _set_block_size
 
