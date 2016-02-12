@@ -297,7 +297,7 @@ class LocoGwas(object): #implements IDistributable
 
     def copyinputs(self, copier):
         if not self.num_pcs == 0:
-            for i in xrange(self.chrom_count):
+            for i in range(self.chrom_count):
                 pc_fn = PrecomputeLocoPcs.create_out_fn(self.pc_prefix, i)
                 copier.input(pc_fn)
         copier.input(self.pheno_fn)
@@ -363,7 +363,7 @@ class FastGwas(object):
         pylab.semilogy(self.p_values)
         pylab.show()
 
-        dummy = [self.res_alt[idx]["nLL"] for idx in xrange(self.n_test)]
+        dummy = [self.res_alt[idx]["nLL"] for idx in range(self.n_test)]
         pylab.hist(dummy, bins=100)
         pylab.title("neg likelihood")
         pylab.show()
@@ -374,43 +374,43 @@ class FastGwas(object):
  
 
     def run_gwas(self):
-		"""
-		invoke all steps in the right order
-		"""
+        """
+        invoke all steps in the right order
+        """
 
-		from fastlmm.inference.lmm_cov import LMM as fastLMM
+        from fastlmm.inference.lmm_cov import LMM as fastLMM
 
-		if self.train_pcs is None and self.train_snps is not None:
-			assert self.mixing == 0.0
-			G = self.train_snps        
-		elif self.train_pcs is not None and self.train_snps is None:
-			assert self.mixing == 0.0
-			G = self.train_pcs
-		else:
-			logging.info("concat pcs, mixing {0}".format(self.mixing))
-			G = np.concatenate((np.sqrt(1.0-self.mixing) * self.train_snps, np.sqrt(self.mixing) * self.train_pcs),1)
+        if self.train_pcs is None and self.train_snps is not None:
+            assert self.mixing == 0.0
+            G = self.train_snps        
+        elif self.train_pcs is not None and self.train_snps is None:
+            assert self.mixing == 0.0
+            G = self.train_pcs
+        else:
+            logging.info("concat pcs, mixing {0}".format(self.mixing))
+            G = np.concatenate((np.sqrt(1.0-self.mixing) * self.train_snps, np.sqrt(self.mixing) * self.train_pcs),1)
 
-		#TODO: make sure low-rank case is handled correctly
-		lmm = fastLMM(X=self.cov, Y=self.phen, G=G, K=None)
+        #TODO: make sure low-rank case is handled correctly
+        lmm = fastLMM(X=self.cov, Y=self.phen, G=G, K=None)
 
-		if self.findh2:
-			opt = lmm.findH2(nGridH2=100)
-			h2 = opt['h2']
-			assert self.delta is None, "either findh2 or set delta"
-		else:
-			h2 = 0.0
-			assert not self.delta is None
-			logging.info("using externally provided delta")
+        if self.findh2:
+            opt = lmm.findH2(nGridH2=100)
+            h2 = opt['h2']
+            assert self.delta is None, "either findh2 or set delta"
+        else:
+            h2 = 0.0
+            assert not self.delta is None
+            logging.info("using externally provided delta")
 
-		res = lmm.nLLeval(h2=h2, delta=self.delta, dof=None, scale=1.0, penalty=0.0, snps=self.test_snps)
+        res = lmm.nLLeval(h2=h2, delta=self.delta, dof=None, scale=1.0, penalty=0.0, snps=self.test_snps)
         
         
-		chi2stats = res['beta']*res['beta']/res['variance_beta']
+        chi2stats = res['beta']*res['beta']/res['variance_beta']
         
-		self.p_values = stats.chi2.sf(chi2stats,1)[:,0]
-		self.p_values_F = stats.f.sf(chi2stats,1,G.shape[0]-3)[:,0]#note that G.shape is the number of individuals and 3 is the number of fixed effects (covariates+SNP)
-		self.p_idx = np.argsort(self.p_values)        
-		self.sorted_p_values = self.p_values[self.p_idx]
+        self.p_values = stats.chi2.sf(chi2stats,1)[:,0]
+        self.p_values_F = stats.f.sf(chi2stats,1,G.shape[0]-3)[:,0]#note that G.shape is the number of individuals and 3 is the number of fixed effects (covariates+SNP)
+        self.p_idx = np.argsort(self.p_values)        
+        self.sorted_p_values = self.p_values[self.p_idx]
 
-		self.p_idx_F = np.argsort(self.p_values_F)
-		self.sorted_p_values_F = self.p_values_F[self.p_idx_F]
+        self.p_idx_F = np.argsort(self.p_values_F)
+        self.sorted_p_values_F = self.p_values_F[self.p_idx_F]

@@ -12,16 +12,17 @@ interface IRunner
 
 '''
 import os
-import cPickle as pickle
+import pickle as pickle
 import fastlmm.util.util as util
 from itertools import *
+import collections
 
 def work_sequence_to_result_sequence (work_sequence):
     '''
     Does all the work in a sequence of work items and returns a sequence of results.
     '''
     for work in work_sequence:
-        if callable(work):
+        if isinstance(work, collections.Callable):
             result = work()
         else:
             result = run_all_in_memory(work)
@@ -32,7 +33,7 @@ def run_all_in_memory(work):
     If callable, just calls
     If distributable, does all the work and then calls reduce on the results.
     '''
-    if callable(work):
+    if isinstance(work, collections.Callable):
         return work()
     else:
         work_sequence = work.work_sequence()
@@ -106,12 +107,12 @@ def work_sequence_from_disk(workdirectory, taskAndWorkcount):
     '''
     Reads all the result sets from the temporary files and returns a sequence results
     '''
-    for taskindex in xrange(taskAndWorkcount):
+    for taskindex in range(taskAndWorkcount):
         task_file_name = create_task_file_name(workdirectory, taskindex, taskAndWorkcount)
         with open(task_file_name, mode='rb') as f:
             try:
                 result = pickle.load(f)
-            except Exception, detail:
+            except Exception as detail:
                 raise Exception("Error trying to unpickle '{0}'. {1}".format(task_file_name,detail))
         yield result
 
@@ -136,7 +137,7 @@ class BatchUpWork(object): # implements IDistributable
 
     def work_sequence_range(self, start, end):
         assert 0 <= start and start <= end and end <= self._workcount, "real assert"
-        for workIndex in xrange(start, end):
+        for workIndex in range(start, end):
             yield lambda workIndex=workIndex : self.work(workIndex)
             
     def work(self,workIndex):
@@ -155,7 +156,7 @@ class BatchUpWork(object): # implements IDistributable
                 index += 1
             assert index == end, "real assert"
         else:
-            sub_workIndexList = range(end-1,start-1,-1)
+            sub_workIndexList = list(range(end-1,start-1,-1))
             for sub_workIndex, sub_work in enumerate(self.sub_distributable.work_sequence()):
                 if sub_workIndex == self.sub_workcount : raise Exception("Expect len(work_sequence) to match work_count")
                 if sub_workIndex ==  sub_workIndexList[-1]:
@@ -175,7 +176,7 @@ class BatchUpWork(object): # implements IDistributable
             workIndex = result.pop(0)
             start, end = self.createSubWorkIndexList(workIndex)
             if (end-start) != len(result) : raise Exception("Assert: batched results not expected size")
-            for sub_workIndex, pair in izip(xrange(start,end), result):
+            for sub_workIndex, pair in zip(range(start,end), result):
                 sub_workIndex_check, sub_result = pair
                 if sub_workIndex != sub_workIndex_check : raise Exception("Assert: Unexpected workindex in batched result")
                 yield sub_result
@@ -265,7 +266,7 @@ class ExpandWork(object): # implements IDistributable
         for sub_work in self.sub_distributable_work_sequence_range(sub_start,sub_end):
             expand_to = self.expand_to(sub_workIndex)
             sub_sub_start, sub_sub_end = self.sub_sub_start_end(sub_workIndex, start, end)
-            if not callable(sub_work): #i.e. a distributable job. If our expand_to is 3 and i's work_count is 9, then it is batched up 3x3. On the other hand, if its work_count is 2, then we ExpandWork from 2 to 3.
+            if not isinstance(sub_work, collections.Callable): #i.e. a distributable job. If our expand_to is 3 and i's work_count is 9, then it is batched up 3x3. On the other hand, if its work_count is 2, then we ExpandWork from 2 to 3.
                 shaped_distributable = shape_to_desired_workcount(sub_work, expand_to)
                 for sub_sub_work in shaped_distributable.work_sequence_range(sub_sub_start, sub_sub_end):
                     yield sub_sub_work
@@ -280,7 +281,7 @@ class ExpandWork(object): # implements IDistributable
                     yield sub_work
                     workIndex += 1
                     sub_sub_index += 1
-                for sub_sub_index2 in xrange(sub_sub_index, sub_sub_end):
+                for sub_sub_index2 in range(sub_sub_index, sub_sub_end):
                     assert sub_sub_index2 == sub_sub_index, "real assert"
                     yield lambda: None
                     workIndex += 1
@@ -328,24 +329,24 @@ class ExpandWork(object): # implements IDistributable
         workIndex=0
         for sub_work in self.sub_distributable.work_sequence():
             expand_to = self.expand_to(sub_workIndex)
-            if not callable(sub_work):
+            if not isinstance(sub_work, collections.Callable):
                 shaped_distributable = shape_to_desired_workcount(sub_work, expand_to)
                 sub_result = SubGen(result_sequence,expand_to)
                 result = shaped_distributable.reduce(sub_result)
                 yield result
                 workIndex += expand_to
             else:
-                yield result_sequence.next()
+                yield next(result_sequence)
                 workIndex += 1
-                for workindex in xrange(1, expand_to):
-                    paddedResultToIgnore = result_sequence.next()
+                for workindex in range(1, expand_to):
+                    paddedResultToIgnore = next(result_sequence)
                     if paddedResultToIgnore != None: raise Exception("Assert: Expected 'None' result")
                     workIndex += 1
             sub_workIndex+=1
         if sub_workIndex != self.sub_workcount : raise Excpetion("Assert:  expect len(result_sequence) to match workcount")
         if workIndex != self._workcount : raise Exception("Assert: expect len(result_sequence) to match workcount")
         try:
-            result_sequence.next() #should get an StopIternation here, which will be ignored.
+            next(result_sequence) #should get an StopIternation here, which will be ignored.
             raise Exception("Assert: expect len(result_sequence) to match workcount")
         except StopIteration:
             pass #do nothing
@@ -368,10 +369,10 @@ class SubGen:
     def __iter__(self):
         return self
         
-    def next(self):
+    def __next__(self):
         if self.count > 0:
             self.count -= 1
-            return self.gen.next()
+            return next(self.gen)
         else:
             raise StopIteration()
 

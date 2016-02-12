@@ -2,7 +2,7 @@
 from collections import defaultdict
 import gzip
 import bz2
-import cPickle
+import pickle
 import time
 import os 
 import gc
@@ -10,6 +10,7 @@ import logging
 
 # common modules
 import matplotlib
+import collections
 matplotlib.use('Agg') #This lets it work even on machines without graphics displays
 import scipy as sp
 import numpy as np
@@ -77,7 +78,7 @@ class PerformSelectionDistributable(object) : #implements IDistributable
 
     def work_sequence(self):
 
-        for fold_idx in xrange(self.feature_selection_strategy.num_folds):
+        for fold_idx in range(self.feature_selection_strategy.num_folds):
             yield lambda fold_idx=fold_idx : self.dowork(fold_idx)  # the 'fold_idx=fold_idx is need to get around a strangeness in Python
         yield lambda output_prefix=self.output_prefix : self.feature_selection_strategy.linreg_entire_dataset(output_prefix)
 
@@ -170,8 +171,8 @@ class PerformSelectionDistributable(object) : #implements IDistributable
 
 
     def __repr__(self):
-        import cStringIO
-        fp = cStringIO.StringIO()
+        import io
+        fp = io.StringIO()
         fp.write("{0}(\n".format(self.__class__.__name__))
         varlist = []
         for f in dir(self):
@@ -179,7 +180,7 @@ class PerformSelectionDistributable(object) : #implements IDistributable
                 continue
             if type(self.__class__.__dict__.get(f,None)) is property: # remove @properties
                 continue
-            if callable(getattr(self, f)): # remove methods
+            if isinstance(getattr(self, f), collections.Callable): # remove methods
                 continue
             varlist.append(f)
         for var in varlist[:-1]: #all but last
@@ -353,7 +354,7 @@ def build_kernel_blocked(snpreader, snp_idx=None, blocksize=10000,alt_snpreader=
 
     if (not allowlowrank) and alt_snpreader.snp_count<N: raise Exception("need to adjust code to handle low rank")
 
-    for start in xrange(0, current_size, blocksize):
+    for start in range(0, current_size, blocksize):
         ct += blocksize
 
         if snp_idx == None:

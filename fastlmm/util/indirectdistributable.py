@@ -1,8 +1,9 @@
 import os
-import cPickle as pickle
+import pickle as pickle
 import subprocess, sys, os.path
 from fastlmm.util.runner import *
 import logging
+import collections
 
 class IndirectDistributable(object): #implements IDistributable
 
@@ -54,8 +55,8 @@ class IndirectDistributable(object): #implements IDistributable
      #end of IDistributable interface---------------------------------------
 
     def __repr__(self):
-        import cStringIO
-        fp = cStringIO.StringIO()
+        import io
+        fp = io.StringIO()
         fp.write("{0}(\n".format(self.__class__.__name__))
         varlist = []
         for f in dir(self):
@@ -63,7 +64,7 @@ class IndirectDistributable(object): #implements IDistributable
                 continue
             if type(self.__class__.__dict__.get(f,None)) is property: # remove @properties
                 continue
-            if callable(getattr(self, f)): # remove methods
+            if isinstance(getattr(self, f), collections.Callable): # remove methods
                 continue
             varlist.append(f)
         for var in varlist[:-1]: #all but last

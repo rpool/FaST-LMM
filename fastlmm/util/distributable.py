@@ -9,7 +9,7 @@ See SamplePi.py for examples.
 
 
 import os
-import cPickle as pickle
+import pickle as pickle
 import subprocess, sys, os.path
 from fastlmm.util.runner import *
 import logging
@@ -69,7 +69,7 @@ if __name__ == "__main__":
     with open(distributablep_filename, mode='rb') as f:
         try:
             distributable = pickle.load(f)
-        except AttributeError, e:
+        except AttributeError as e:
             raise AttributeError("An AttributeError when loading the pickle file is often caused by having the __main__ in the same file as a needed class. One possible fix is to add an import statement in the __main__ for the class. [Original message: '{0}'".format(e))
             
 

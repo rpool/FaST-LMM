@@ -31,7 +31,7 @@ def compute_auto_pcs(snpreader, cutoff=.1, k_values=np.arange(11), output_file_n
     >>> logging.basicConfig(level=logging.INFO)
     >>> file_name = "../feature_selection/examples/toydata"
     >>> best_pcs = compute_auto_pcs(file_name)
-    >>> print int(best_pcs['vals'].shape[0]),int(best_pcs['vals'].shape[1])
+    >>> print( int(best_pcs['vals'].shape[0]),int(best_pcs['vals'].shape[1]) )
     500 0
 
     """
@@ -49,7 +49,7 @@ def compute_auto_pcs(snpreader, cutoff=.1, k_values=np.arange(11), output_file_n
     import fastlmm.util.VertexCut as vc
     remove_set = set(vc.VertexCut().work(rrm,cutoff)) #These are the indexes of the IIDs to remove
     logging.info("removing {0} of {1} iids".format(len(remove_set), snpreader.iid_count))
-    keep_list = [x for x in xrange(all_std_snpdata.iid_count) if x not in remove_set]
+    keep_list = [x for x in range(all_std_snpdata.iid_count) if x not in remove_set]
     nofam_snpreader = all_std_snpdata[keep_list,:]
     #nofam_snpreader = all_std_snpdata#[1:,:]
     #print "#!!warning skipping  vertext cut"
@@ -144,5 +144,5 @@ if __name__ == "__main__":
     #print result
 
 
-    print "done"
+    print("done")
 

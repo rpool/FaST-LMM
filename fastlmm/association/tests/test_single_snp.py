@@ -328,7 +328,7 @@ class TestSingleSnpLeaveOutOneChrom(unittest.TestCase):
             pheno = self.phen_fn
             covar = self.cov_fn
             covar_by_chrom = {}
-            for chrom in xrange(1,6):
+            for chrom in range(1,6):
                 covar_by_chrom[chrom] = covar
             output_file = self.file_name("covar_by_chrom")
             frame = single_snp_leave_out_one_chrom(test_snps, pheno,
@@ -346,7 +346,7 @@ class TestSingleSnpLeaveOutOneChrom(unittest.TestCase):
             pheno = self.phen_fn
             covar = self.cov_fn
             covar_by_chrom = {}
-            for chrom in xrange(1,6):
+            for chrom in range(1,6):
                 covar_by_chrom[chrom] = covar
             output_file = self.file_name("covar_by_chrom_mixing")
             frame = single_snp_leave_out_one_chrom(test_snps, pheno,
@@ -410,7 +410,7 @@ if __name__ == '__main__':
         #runner = LocalInParts(1,2,mkl_num_threads=1) # For debugging the cluster runs
         #runner = Hadoop(100, mapmemory=8*1024, reducememory=8*1024, mkl_num_threads=1, queue="default")
         distributable_test = DistributableTest(suites,"temp_test")
-        print runner.run(distributable_test)
+        print(runner.run(distributable_test))
 
 
     logging.info("done with testing")

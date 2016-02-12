@@ -6,7 +6,7 @@ See SamplePi.py for examples.
 
 from fastlmm.util.runner import *
 import os
-import cPickle as pickle
+import pickle as pickle
 import subprocess, sys, os.path
 import multiprocessing
 import logging
@@ -48,7 +48,7 @@ class LocalMultiProc: # implements IRunner
         command_format_string = sys.executable + " " + distributable_py_file + " " + distributablep_filename +" LocalInParts({0},{1},mkl_num_threads={2})".format("{0}", self.taskcount, self.mkl_num_threads)
 
         proc_list = []
-        for taskindex in xrange(self.taskcount):
+        for taskindex in range(self.taskcount):
             command_string = command_format_string.format(taskindex)
             proc = subprocess.Popen(command_string.split(" "), cwd=os.getcwd())
             proc_list.append(proc)

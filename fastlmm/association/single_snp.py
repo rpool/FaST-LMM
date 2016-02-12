@@ -288,7 +288,7 @@ def _internal_single(G0_standardized, test_snps, pheno,covar, G1_standardized,
     snps_read = test_snps.read().standardize()
     
     if interact_with_snp is not None:
-        print "interaction with %i" % interact_with_snp
+        print("interaction with %i" % interact_with_snp)
         interact = covar[:,interact_with_snp]
         interact -=interact.mean()
         interact /= interact.std()

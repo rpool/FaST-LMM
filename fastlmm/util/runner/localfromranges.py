@@ -7,8 +7,9 @@ from fastlmm.util.runner import *
 import os, sys
 import logging
 import fastlmm.util.util as util
-import cPickle as pickle
+import pickle as pickle
 import itertools
+import collections
 
 class LocalFromRanges: # implements IRunner
     '''
@@ -39,7 +40,7 @@ class LocalFromRanges: # implements IRunner
     def run(self, distributable):
         JustCheckExists().input(distributable)
 
-        if callable(distributable):
+        if isinstance(distributable, collections.Callable):
             result = distributable()
         else:
             count = self.end_list[-1]
