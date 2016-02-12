@@ -10,7 +10,7 @@ from fastlmm.association.FastLmmSet import FastLmmSet
 from fastlmm.association.FastLmmSet import Local
 import unittest
 import subprocess
-import fastlmm.inference.test
+import fastlmm.inference.tests.test
 import fastlmm.feature_selection.test
 import pysnptools.test
 import fastlmm.util.testdistributable
@@ -149,7 +149,7 @@ if __name__ == '__main__':
 
                                     fastlmm.util.test.getTestSuite(),
                                     tests.test.getTestSuite(),
-                                    fastlmm.inference.test.getTestSuite(),
+                                    fastlmm.inference.tests.test.getTestSuite(),
                                     fastlmm.association.tests.test_single_snp.getTestSuite(),
                                     fastlmm.association.tests.test_single_snp_linreg.getTestSuite(),
                                     fastlmm.association.tests.test_single_snp_all_plus_select.getTestSuite(),
