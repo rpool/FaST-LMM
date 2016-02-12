@@ -9,6 +9,7 @@ See SamplePi.py for examples.
 
 
 import os
+import logging
 try:
     import dill as pickle
 except:
@@ -16,7 +17,6 @@ except:
     import cPickle as pickle
 import subprocess, sys, os.path
 from fastlmm.util.runner import *
-import logging
 
 class IDistributable(object):
     @property
