@@ -54,7 +54,9 @@
     <Compile Include="epistasis.py">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="fastlmmmodel.py">
+    <Compile Include="single_snp_linreg.py" />
+    <Compile Include="single_snp_select.py" />
+    <Compile Include="single_snp_all_plus_select.py">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="gwas.py" />
@@ -76,6 +78,11 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="tests\testepistasis.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="tests\test_single_snp_linreg.py" />
+    <Compile Include="tests\test_single_snp_select.py" />
+    <Compile Include="tests\test_single_snp_all_plus_select.py">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="tests\test_heritability_spatial_correction.py" />

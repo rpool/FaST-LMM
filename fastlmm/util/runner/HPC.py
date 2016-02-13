@@ -6,17 +6,21 @@ See SamplePi.py for examples.
 
 from fastlmm.util.runner import *
 import os
-import pickle as pickle
 import subprocess, sys, os.path
 import multiprocessing
 import fastlmm.util.util as util
 import pdb
 import logging
+try:
+    import dill as pickle
+except:
+    logging.warning("Can't import dill, so won't be able to clusterize lambda expressions. If you try, you'll get this error 'Can't pickle <type 'function'>: attribute lookup __builtin__.function failed'")
+    import cPickle as pickle
 
 class HPC: # implements IRunner
     #!!LATER make it (and Hadoop) work from root directories -- or give a clear error message
     def __init__(self, taskcount, clustername, fileshare, priority="Normal", unit="core", mkl_num_threads=None, runtime="infinite", remote_python_parent=None,
-                update_remote_python_parent=False, min=None, max=None, excluded_nodes=[], template=None, nodegroups=None, skipinputcopy=False, logging_handler=logging.StreamHandler(sys.stdout)):
+                update_remote_python_parent=False, min=None, max=None, excluded_nodes=[], template=None, nodegroups=None, skipinputcopy=False, node_local=True,clean_up=True,preemptable=True,logging_handler=logging.StreamHandler(sys.stdout)):
         logger = logging.getLogger()
         if not logger.handlers:
             logger.setLevel(logging.INFO)
@@ -42,6 +46,9 @@ class HPC: # implements IRunner
         self.skipinputcopy=skipinputcopy
         self.template = template
         self.nodegroups = nodegroups
+        self.node_local = node_local
+        self.clean_up = clean_up
+        self.preemptable = preemptable
       
     def run(self, distributable):
         # Check that the local machine has python path set
@@ -50,7 +57,7 @@ class HPC: # implements IRunner
 
         remotepythoninstall = self.check_remote_pythoninstall()
 
-        remotewd, run_dir_abs, run_dir_rel = self.create_run_dir()
+        remotewd, run_dir_abs, run_dir_rel, nodelocalwd = self.create_run_dir()
         util.create_directory_if_necessary(os.path.join(remotewd, distributable.tempdirectory), isfile=False) #create temp directory now so that cluster tasks won't try to create it many times at once
         result_remote = os.path.join(run_dir_abs,"result.p")
 
@@ -62,12 +69,13 @@ class HPC: # implements IRunner
 
         remotepythonpath = self.FindOrCreateRemotePythonPath(localpythonpath, run_dir_abs)
 
-        batfilename_rel = self.create_bat_file(distributable, remotepythoninstall, remotepythonpath, remotewd, run_dir_abs, run_dir_rel, result_remote)
+        batfilename_rel = self.create_bat_file(distributable, remotepythoninstall, remotepythonpath, remotewd, run_dir_abs, run_dir_rel, result_remote, nodelocalwd, distributable)
 
-        self.submit_to_cluster(batfilename_rel, distributable, remotewd, run_dir_abs, run_dir_rel)
+        self.submit_to_cluster(batfilename_rel, distributable, remotewd, run_dir_abs, run_dir_rel, nodelocalwd)
 
         inputOutputCopier.output(distributable) # copy the output file from where they were created (i.e. the cluster) to the local computer
 
+        assert os.path.exists(result_remote), "The HPC job produced no result (and, thus, likely failed)"
         with open(result_remote, mode='rb') as f:
             result = pickle.load(f)
 
@@ -121,7 +129,7 @@ class HPC: # implements IRunner
             return " -Num{0} {1}-*".format(self.unit.capitalize(), self.min)
         return " -Num{0} {1}-{2}".format(self.unit.capitalize(), self.min, self.max)
 
-    def submit_to_cluster(self, batfilename_rel, distributable, remotewd, run_dir_abs, run_dir_rel):
+    def submit_to_cluster(self, batfilename_rel, distributable, remotewd, run_dir_abs, run_dir_rel, nodelocalwd):
         stdout_dir_rel = os.path.join(run_dir_rel,"stdout")
         stdout_dir_abs = os.path.join(run_dir_abs,"stdout")
         util.create_directory_if_necessary(stdout_dir_abs, isfile=False)
@@ -142,10 +150,23 @@ class HPC: # implements IRunner
         with open(psfilename_abs, "w") as psfile:
             psfile.write(r"""Add-PsSnapin Microsoft.HPC
         Set-Content Env:CCP_SCHEDULER {0}
-        $r = New-HpcJob -Name "{7}" -Priority {8}{12}{14}{16} -RunTime {15}
+        $r = New-HpcJob -Name "{7}" -Priority {8}{12}{14}{16} -RunTime {15}  #-Preemptable {22}
         $r.Id
-        Add-HpcTask -Name Parametric -JobId $r.Id -Parametric -Start 0 -End {1} -CommandLine "{6} * {5}" -StdOut "{2}\*.txt" -StdErr "{3}\*.txt" -WorkDir {4}
-        Add-HpcTask -Name Reduce -JobId $r.Id -Depend Parametric -CommandLine "{6} {5} {5}" -StdOut "{2}\reduce.txt" -StdErr "{3}\reduce.txt" -WorkDir {4}
+        if ({20})
+        {10}
+            $from = "{4}"
+            $to = "{17}"
+            Add-HpcTask -Name NodePrep    -JobId $r.Id -Type NodePrep                -CommandLine "${{from}}\{18}"        -StdOut "${{from}}\{2}\nodeprep.txt"    -StdErr "${{from}}\{3}\nodeprep.txt"    -WorkDir .
+            Add-HpcTask -Name Parametric  -JobId $r.Id -Parametric -Start 0 -End {1} -CommandLine "${{from}}\{6} * {5}"   -StdOut "${{from}}\{2}\*.txt"    -StdErr "${{from}}\{3}\*.txt"                  -WorkDir $to
+            Add-HpcTask -Name Reduce      -JobId $r.Id -Depend Parametric            -CommandLine "${{from}}\{6} {5} {5}" -StdOut "${{from}}\{2}\reduce.txt"      -StdErr "${{from}}\{3}\reduce.txt"      -WorkDir $to
+            {21}Add-HpcTask -Name NodeRelease -JobId $r.Id -Type NodeRelease         -CommandLine "${{from}}\{19}"        -StdOut "${{from}}\{2}\noderelease.txt" -StdErr "${{from}}\{3}\noderelease.txt" -WorkDir .
+        {11}
+        else
+        {10}
+            Add-HpcTask -Name Parametric -JobId $r.Id -Parametric -Start 0 -End {1} -CommandLine "{6} * {5}" -StdOut "{2}\*.txt" -StdErr "{3}\*.txt" -WorkDir {4}
+            Add-HpcTask -Name Reduce -JobId $r.Id -Depend Parametric -CommandLine "{6} {5} {5}" -StdOut "{2}\reduce.txt" -StdErr "{3}\reduce.txt" -WorkDir {4}
+        {11}
+
         {13}
         Submit-HpcJob -Id $r.Id
         $j = Get-HpcJob -Id $r.Id
@@ -159,7 +180,7 @@ class HPC: # implements IRunner
             Start-Sleep -s $s
             if ($s -ge 60)
             {10}
-	        $s = 60
+            $s = 60
             {11}
             else
             {10}
@@ -173,7 +194,7 @@ class HPC: # implements IRunner
                                 self.taskcount-1,   #1
                                 stdout_dir_rel,     #2
                                 stderr_dir_rel,     #3
-                                remotewd,           #4
+                                remotewd,           #4 fileshare wd
                                 self.taskcount,     #5
                                 batfilename_rel,    #6
                                 self.maxlen(str(distributable),50),      #7
@@ -184,10 +205,16 @@ class HPC: # implements IRunner
                                 self.numString(),   #12
                                 excluded_nodes,     #13
                                 ' -templateName "{0}"'.format(self.template) if self.template is not None else "", #14
-                                self.runtime,            #15 RuntimeSeconds
-                                ' -NodeGroups "{0}"'.format(self.nodegroups) if self.nodegroups is not None else "" #16
+                                self.runtime,       #15 RuntimeSeconds
+                                ' -NodeGroups "{0}"'.format(self.nodegroups) if self.nodegroups is not None else "", #16
+                                nodelocalwd,        #17 the node-local wd
+                                batfilename_rel[0:-8]+"nodeprep.bat", #18
+                                batfilename_rel[0:-8]+"noderelease.bat", #19
+                                1 if self.node_local else 0,             #20
+                                "" if self.clean_up else "#",            #21 if clean_up is false, comment out node release tasks
+                                self.preemptable,                        #22
                                 ))
-
+        assert batfilename_rel[-8:] == "dist.bat", "real assert"
         import subprocess
         proc = subprocess.Popen(["powershell.exe", "-ExecutionPolicy", "Unrestricted", psfilename_abs], cwd=os.getcwd())
         if not 0 == proc.wait(): raise Exception("Running powershell cluster submit script results in non-zero return code")
@@ -210,7 +237,7 @@ class HPC: # implements IRunner
         distributablep_filename_abs = os.path.join(run_dir_abs, "distributable.p")
         with open(distributablep_filename_abs, mode='wb') as f:
             pickle.dump(distributable, f, pickle.HIGHEST_PROTOCOL)
-        return distributablep_filename_rel
+        return distributablep_filename_rel, distributablep_filename_abs
 
     @staticmethod
     def FindDirectoriesToExclude(localpythonpathdir):
@@ -241,7 +268,7 @@ class HPC: # implements IRunner
         remotepythonpath = ";".join(remotepythonpath_list)
         return remotepythonpath
 
-    def create_bat_file(self, distributable, remotepythoninstall, remotepythonpath, remotewd, run_dir_abs, run_dir_rel, result_remote):
+    def create_bat_file(self, distributable, remotepythoninstall, remotepythonpath, remotewd, run_dir_abs, run_dir_rel, result_remote, nodelocalwd, create_bat_file):
         path_share_list = [r"",r"Scripts"]
         remotepath_list = []
         for path_share in path_share_list:
@@ -250,16 +277,27 @@ class HPC: # implements IRunner
             remotepath_list.append(path_share_abs)
         remotepath = ";".join(remotepath_list)
 
-        distributablep_filename_rel = self.create_distributablep(distributable, run_dir_abs, run_dir_rel)
+        distributablep_filename_rel, distributablep_filename_abs = self.create_distributablep(distributable, run_dir_abs, run_dir_rel)
 
         distributable_py_file = os.path.join(os.path.dirname(__file__),"..","distributable.py")
         if not os.path.exists(distributable_py_file): raise Exception("Expect file at " + distributable_py_file + ", but it doesn't exist.")
         localfilepath, file = os.path.split(distributable_py_file)
-        remoteexepath = os.path.join(remotepythonpath.split(';')[0],"fastlmm","util") #!!shouldn't need to assume where the file is in source
+
+        for remote_path_part in remotepythonpath.split(';'):
+            remoteexe = os.path.join(remote_path_part,"fastlmm","util",file)
+            if os.path.exists(remoteexe):
+                break #not continue
+            remoteexe = None
+        assert remoteexe is not None, "Could not find '{0}' on remote python path. Is fastlmm on your local python path?".format(file)
+
         #run_dir_rel + os.path.sep + "pythonpath" + os.path.sep + os.path.splitdrive(localfilepath)[1]
 
-        result_remote2 = result_remote.encode("string-escape")
-        command_string = remoteexepath + os.path.sep + file + " " + distributablep_filename_rel + r""" "LocalInParts(%1,{0},mkl_num_threads={1},result_file=""{2}"") " """.format(self.taskcount,self.mkl_num_threads,result_remote2)
+        #result_remote2 = result_remote.encode("string-escape")
+        command_string = remoteexe + r""" "{0}" """.format(distributablep_filename_abs) + r""" "LocalInParts(%1,{0},mkl_num_threads={1},result_file=""{2}"",run_dir=""{3}"") " """.format(
+            self.taskcount,
+            self.mkl_num_threads,
+            "result.p",
+            run_dir_abs.encode("string-escape"))
         batfilename_rel = os.path.join(run_dir_rel,"dist.bat")
         batfilename_abs = os.path.join(run_dir_abs,"dist.bat")
         util.create_directory_if_necessary(batfilename_abs, isfile=True)
@@ -273,17 +311,30 @@ class HPC: # implements IRunner
         with open(batfilename_abs, "w") as batfile:
             batfile.write("set path={0};%path%\n".format(remotepath))
             batfile.write("set PYTHONPATH={0}\n".format(remotepythonpath))
-            #batfile.write("set R_HOME={0}\n".format(os.path.join(remotepythoninstall,"R-2.15.2")))
-            #batfile.write("set R_USER={0}\n".format(remotewd))
-            batfile.write("set USERPROFILE={0}\n".format(run_dir_rel))
-            batfile.write("set MPLCONFIGDIR={0}\n".format(matplotlibfilename_rel))
-            batfile.write("set IPYTHONDIR={0}\n".format(ipythondir_rel))            
+            batfile.write("set USERPROFILE={0}\n".format(run_dir_abs))
+            batfile.write("set MPLCONFIGDIR={0}\n".format(matplotlibfilename_abs))
+            batfile.write("set IPYTHONDIR={0}\n".format(ipythondir_abs))
             batfile.write("python {0}\n".format(command_string))
+
+        if (self.node_local):
+            with open( os.path.join(run_dir_abs,"nodeprep.bat"), "w") as prepfile:
+                prepfile.write(r"""set f="{0}"{1}""".format(remotewd,'\n'))
+                prepfile.write(r"""set t="{0}"{1}""".format(nodelocalwd,'\n'))
+                prepfile.write("if not exist %t% mkdir %t%\n")
+                with open( os.path.join(run_dir_abs,"noderelease.bat"), "w") as releasefile:
+                    releasefile.write(r"""set f="{0}"{1}""".format(remotewd,'\n'))
+                    releasefile.write(r"""set t="{0}"{1}""".format(nodelocalwd,'\n'))
+                    inputOutputCopier = HPCCopierNodeLocal(prepfile,releasefile) #Create the object that copies input and output files to where they are needed
+                    inputOutputCopier.input(distributable) # copy of the input files to where they are needed (i.e. the cluster)
+                    inputOutputCopier.output(distributable) # copy of the input files to where they are needed (i.e. the cluster)
+                    releasefile.write("rmdir %t%\n")
+                    releasefile.write("exit /b 0\n")
+
 
         return batfilename_rel
 
     def check_remote_pythoninstall(self):
-        remotepythoninstall = self.fileshare + os.path.sep + "pythonInstallB"
+        remotepythoninstall = self.fileshare + os.path.sep + "pythonInstallC"
         if not os.path.isdir(remotepythoninstall): raise Exception("Expect Python and related directories at '{0}'".format(remotepythoninstall))
 
         return remotepythoninstall
@@ -294,14 +345,18 @@ class HPC: # implements IRunner
         #!!make an option to specify the full remote WD. Also what is the "\\\\" case for?
         if localwd.startswith("\\\\"):
             remotewd = self.fileshare + os.path.sep + username +os.path.sep + "\\".join(localwd.split('\\')[4:])
+            nodelocalwd =  "d:\scratch\escience" + os.path.sep + username +os.path.sep + "\\".join(localwd.split('\\')[4:]) #!!!const
         else:
             remotewd = self.fileshare + os.path.sep + username + os.path.splitdrive(localwd)[1]  #using '+' because 'os.path.join' isn't work with shares
+            nodelocalwd = "d:\scratch\escience" + os.path.sep + username + os.path.splitdrive(localwd)[1]  #!!! const
         import datetime
         now = datetime.datetime.now()
         run_dir_rel = os.path.join("runs",util.datestamp(appendrandom=True))
         run_dir_abs = os.path.join(remotewd,run_dir_rel)
         util.create_directory_if_necessary(run_dir_abs,isfile=False)
-        return remotewd, run_dir_abs, run_dir_rel
+
+
+        return remotewd, run_dir_abs, run_dir_rel, nodelocalwd
 
 
 class HPCCopier(object): #Implements ICopier
@@ -321,7 +376,7 @@ class HPCCopier(object): #Implements ICopier
             xcopycommand = "xcopy /d /e /s /c /h /y {0} {1}".format(itemnorm, remote_dir_name)
             logging.info(xcopycommand)
             rc = os.system(xcopycommand)
-            print("rc=" +str(rc))
+            print "rc=" +str(rc)
             if rc!=0: raise Exception("xcopy cmd failed with return value={0}, from cmd {1}".format(rc,xcopycommand))
         elif hasattr(item,"copyinputs"):
             item.copyinputs(self)
@@ -333,11 +388,39 @@ class HPCCopier(object): #Implements ICopier
             util.create_directory_if_necessary(itemnorm)
             remote_file_name = os.path.join(self.remotewd,itemnorm)
             local_dir_name,ignore = os.path.split(itemnorm)
+            assert os.path.exists(remote_file_name), "Don't see expected file '{0}'. Did the HPC job fail?".format(remote_file_name)
             #xcopycommand = "xcopy /d /e /s /c /h /y {0} {1}".format(remote_file_name, local_dir_name) # we copy to the local dir instead of the local file so that xcopy won't ask 'file or dir?'
             xcopycommand = "xcopy /d /c /y {0} {1}".format(remote_file_name, local_dir_name) # we copy to the local 
             logging.info(xcopycommand)
             rc = os.system(xcopycommand)
             if rc!=0: logging.info("xcopy cmd failed with return value={0}, from cmd {1}".format(rc,xcopycommand))
+        elif hasattr(item,"copyoutputs"):
+            item.copyoutputs(self)
+        # else -- do nothing
+
+class HPCCopierNodeLocal(object): #Implements ICopier
+
+    def __init__(self, fileprep, filerelease):
+        self.fileprep = fileprep
+        self.filerelease = filerelease
+
+    def input(self,item):
+        if isinstance(item, str):
+            itemnorm = os.path.normpath(item)
+            dirname = os.path.dirname(itemnorm)
+            self.fileprep.write("if not exist %t%\{0} mkdir %t%\{0}\n".format(dirname))
+            self.fileprep.write("xcopy /d /e /s /c /h /y %f%\{0} %t%\{1}\n".format(itemnorm,dirname))
+            self.filerelease.write("del %t%\{0}\n".format(itemnorm))
+        elif hasattr(item,"copyinputs"):
+            item.copyinputs(self)
+        # else -- do nothing
+
+    def output(self,item):
+        if isinstance(item, str):
+            itemnorm = os.path.normpath(item)
+            dirname = os.path.dirname(itemnorm)
+            self.filerelease.write("xcopy /d /e /s /c /h /y %t%\{0} %f%\{1}\n".format(itemnorm,dirname))
+            self.filerelease.write("del %t%\{0}\n".format(itemnorm))
         elif hasattr(item,"copyoutputs"):
             item.copyoutputs(self)
         # else -- do nothing

@@ -33,7 +33,7 @@ class ConsecutivePlusBed(object): # implements ISnpSetListPlusBed
         self.spec = spec
         self.bed = bed
         import pandas as pd
-        bimfields = pd.read_csv(self.spec.BimFileName,delimiter = '\s',usecols = (0,1,2,3),header=None,index_col=False)
+        bimfields = pd.read_csv(self.spec.BimFileName,delimiter = '\s',usecols = (0,1,2,3),header=None,index_col=False,engine='python')
         self.chrom = bimfields[0]
         self.rs = bimfields[1]
         self.cm = bimfields[2]
@@ -52,7 +52,7 @@ class ConsecutivePlusBed(object): # implements ISnpSetListPlusBed
             midIndex = math.floor((startIndex+lastIndex)/2.0)
             name = "{0}@{1}@{2}".format(startIndex,midIndex,lastIndex)
 
-            snpList=self.rs[list(range(startIndex,endIndex))]
+            snpList=self.rs[range(startIndex,endIndex)]
             yield SnpAndSetNamePlusBed(name,snpList,self.bed)                
 
     def __len__(self):

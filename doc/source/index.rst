@@ -14,27 +14,62 @@ https://github.com/MicrosoftGenomics/FaST-LMM/blob/master/doc/ipynb/FaST-LMM.ipy
 
 
 **************************************************
-:mod:`epistasis`
-**************************************************
-.. autofunction:: fastlmm.association.epistasis
-
-**************************************************
 :mod:`single_snp`
 **************************************************
 
 .. autofunction:: fastlmm.association.single_snp
 
 **************************************************
-:mod:`single_snp_leave_out_one_chrom`
+:mod:`single_snp_all_plus_select`
 **************************************************
 
-.. autofunction:: fastlmm.association.single_snp_leave_out_one_chrom
+.. autofunction:: fastlmm.association.single_snp_all_plus_select
+
+
+**************************************************
+:mod:`single_snp_linreg`
+**************************************************
+
+.. autofunction:: fastlmm.association.single_snp_linreg
+
+
+**************************************************
+:mod:`single_snp_select`
+**************************************************
+
+.. autofunction:: fastlmm.association.single_snp_select
+
+
+**************************************************
+:mod:`epistasis`
+**************************************************
+.. autofunction:: fastlmm.association.epistasis
+
 
 **************************************************
 :mod:`snp_set`
 **************************************************
 .. autofunction:: fastlmm.association.snp_set
 
+
+
+**************************************************
+:class:`FastLMM`
+**************************************************
+.. autoclass:: fastlmm.inference.FastLMM
+    :members:
+    :undoc-members:
+	:show-inheritance:
+	:special-members:
+
+**************************************************
+:class:`LinearRegression`
+**************************************************
+.. autoclass:: fastlmm.inference.LinearRegression
+    :members:
+    :undoc-members:
+	:show-inheritance:
+	:special-members:
 
 **************************************************
 :mod:`heritability_spatial_correction`

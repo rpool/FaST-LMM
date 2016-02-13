@@ -6,15 +6,20 @@ See SamplePi.py for examples.
 
 from fastlmm.util.runner import *
 import os
-import pickle as pickle
+import logging
+try:
+    import dill as pickle
+except:
+    logging.warning("Can't import dill, so won't be able to clusterize lambda expressions. If you try, you'll get this error 'Can't pickle <type 'function'>: attribute lookup __builtin__.function failed'")
+    import cPickle as pickle
 import subprocess, sys, os.path
 import multiprocessing
-import logging
 import fastlmm.util.util as util
 
 class LocalMultiProc: # implements IRunner
 
-    def __init__(self, taskcount, mkl_num_threads = None,logging_handler=logging.StreamHandler(sys.stdout)):
+    def __init__(self, taskcount, mkl_num_threads = None, just_one_process = False, logging_handler=logging.StreamHandler(sys.stdout)):
+        self.just_one_process = just_one_process
         logger = logging.getLogger()
         if not logger.handlers:
             logger.setLevel(logging.INFO)
@@ -47,18 +52,25 @@ class LocalMultiProc: # implements IRunner
         if not os.path.exists(distributable_py_file): raise Exception("Expect file at " + distributable_py_file + ", but it doesn't exist.")
         command_format_string = sys.executable + " " + distributable_py_file + " " + distributablep_filename +" LocalInParts({0},{1},mkl_num_threads={2})".format("{0}", self.taskcount, self.mkl_num_threads)
 
-        proc_list = []
-        for taskindex in range(self.taskcount):
-            command_string = command_format_string.format(taskindex)
-            proc = subprocess.Popen(command_string.split(" "), cwd=os.getcwd())
-            proc_list.append(proc)
+        if not self.just_one_process:
+            proc_list = []
+            for taskindex in xrange(self.taskcount):
+                command_string = command_format_string.format(taskindex)
+                proc = subprocess.Popen(command_string.split(" "), cwd=os.getcwd())
+                proc_list.append(proc)
 
-        for taskindex, proc in enumerate(proc_list):            
-            rc = proc.wait()
-            #for line in proc.stdout.readlines():
-            #    sys.stdout.write(line)
-            if not 0 == rc : raise Exception("Running python in python results in non-zero return code in task#{0}".format(taskindex))
+            for taskindex, proc in enumerate(proc_list):            
+                rc = proc.wait()
+                #for line in proc.stdout.readlines():
+                #    sys.stdout.write(line)
+                if not 0 == rc : raise Exception("Running python in python results in non-zero return code in task#{0}".format(taskindex))
+        else:
+            from fastlmm.util.runner import LocalInParts
+            for taskindex in xrange(self.taskcount):
+                LocalInParts(taskindex,self.taskcount, mkl_num_threads=self.mkl_num_threads).run(distributable)
 
         result = run_one_task(distributable, self.taskcount, self.taskcount, distributable.tempdirectory)
+
+
         JustCheckExists().output(distributable)
         return result

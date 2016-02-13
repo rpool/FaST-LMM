@@ -31,7 +31,7 @@ def compute_auto_pcs(snpreader, cutoff=.1, k_values=np.arange(11), output_file_n
     >>> logging.basicConfig(level=logging.INFO)
     >>> file_name = "../feature_selection/examples/toydata"
     >>> best_pcs = compute_auto_pcs(file_name)
-    >>> print( int(best_pcs['vals'].shape[0]),int(best_pcs['vals'].shape[1]) )
+    >>> print int(best_pcs['vals'].shape[0]),int(best_pcs['vals'].shape[1])
     500 0
 
     """
@@ -49,7 +49,7 @@ def compute_auto_pcs(snpreader, cutoff=.1, k_values=np.arange(11), output_file_n
     import fastlmm.util.VertexCut as vc
     remove_set = set(vc.VertexCut().work(rrm,cutoff)) #These are the indexes of the IIDs to remove
     logging.info("removing {0} of {1} iids".format(len(remove_set), snpreader.iid_count))
-    keep_list = [x for x in range(all_std_snpdata.iid_count) if x not in remove_set]
+    keep_list = [x for x in xrange(all_std_snpdata.iid_count) if x not in remove_set]
     nofam_snpreader = all_std_snpdata[keep_list,:]
     #nofam_snpreader = all_std_snpdata#[1:,:]
     #print "#!!warning skipping  vertext cut"
@@ -62,32 +62,32 @@ def compute_auto_pcs(snpreader, cutoff=.1, k_values=np.arange(11), output_file_n
     from sklearn.cross_validation import KFold
     n_folds = 10
     folds = KFold(nofam_snpreader.sid_count, n_folds = n_folds, shuffle=True, random_state=randomstate)
-    	
+        
     scores = np.zeros((k_values.shape[0],n_folds))
     for i_fold, [train_idx,test_idx] in enumerate(folds):
-    	Utr,Str,Vtr,mean = None, None, None, None
-    	logging.info('test set size: {0}'.format(len(test_idx)))
+        Utr,Str,Vtr,mean = None, None, None, None
+        logging.info('test set size: {0}'.format(len(test_idx)))
 
-    	logging.info('creating X_train for fold {0}'.format(i_fold))
-    	t0 = time.time()
-    	X_train = nofam_snpreader[:,train_idx].read(order='F').val.T#!!would order='C' be faster?
-    	logging.info("done after %.4f seconds" % (time.time() - t0))
+        logging.info('creating X_train for fold {0}'.format(i_fold))
+        t0 = time.time()
+        X_train = nofam_snpreader[:,train_idx].read(order='F').val.T#!!would order='C' be faster?
+        logging.info("done after %.4f seconds" % (time.time() - t0))
 
-    	logging.info('creating X_test for fold {0}'.format(i_fold))
-    	t0 = time.time()
-    	X_test = nofam_snpreader[:,test_idx].read(order='F').val.T
-    	logging.info("done after %.4f seconds" % (time.time() - t0))
+        logging.info('creating X_test for fold {0}'.format(i_fold))
+        t0 = time.time()
+        X_test = nofam_snpreader[:,test_idx].read(order='F').val.T
+        logging.info("done after %.4f seconds" % (time.time() - t0))
 
-    	logging.info('Creating svd')
-    	t0 = time.time()
-    	for i_k, k in enumerate(k_values):
-    		pca = PCA(n_components = k, copy=False)
-    		Utr,Str,Vtr,mean = pca._fit(X_train,Utr,Str,Vtr,mean)
-    		if t0 is not None:
-    		    logging.info("done after %.4f seconds" % (time.time() - t0))
-    		    t0 = None
-    		scores[i_k,i_fold] = pca.score(X_test)
-    		logging.info("{0},{1},{2}".format(i_fold, k, scores[i_k,i_fold]))
+        logging.info('Creating svd')
+        t0 = time.time()
+        for i_k, k in enumerate(k_values):
+            pca = PCA(n_components = k, copy=False)
+            Utr,Str,Vtr,mean = pca._fit(X_train,Utr,Str,Vtr,mean)
+            if t0 is not None:
+                logging.info("done after %.4f seconds" % (time.time() - t0))
+                t0 = None
+            scores[i_k,i_fold] = pca.score(X_test)
+            logging.info("{0},{1},{2}".format(i_fold, k, scores[i_k,i_fold]))
 
     normalizedMean = scores.mean(axis=1)
 
@@ -119,7 +119,7 @@ def compute_auto_pcs(snpreader, cutoff=.1, k_values=np.arange(11), output_file_n
                 f.write(' '.join([str(pc) for pc in X_fit[iid_index, :]]))
                 f.write('\n')
 
-    result = {'iid':sp.array(snpreader.iid),'vals':X_fit}
+    result = {'iid':sp.array(snpreader.iid),'vals':X_fit, 'header':["pc_{0}".format(index) for index in xrange(bestNumPCs)]}
     return result
 
 def _snp_fixup(snp_input):
@@ -144,5 +144,5 @@ if __name__ == "__main__":
     #print result
 
 
-    print("done")
+    print "done"
 

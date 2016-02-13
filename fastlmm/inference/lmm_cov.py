@@ -116,9 +116,9 @@ class LMM(object):
                     self.S = self.S[inonzero]
                     self.S = self.S * self.S
                     self.U = self.U[:,inonzero]
-                
+                    
                 except la.LinAlgError:  # revert to Eigenvalue decomposition
-                    print("Got SVD exception, trying eigenvalue decomposition of square of G. Note that this is a little bit less accurate")
+                    print "Got SVD exception, trying eigenvalue decomposition of square of G. Note that this is a little bit less accurate"
                     [S,V] = la.eigh(PxG.T.dot(PxG))
                     if np.any(S < -0.1):
                         logging.warning("kernel contains a negative Eigenvalue")
@@ -142,9 +142,13 @@ class LMM(object):
         """
         if self.U is None or self.S is None:
             if self.K is not None:
+                logging.debug("starting 'lmm_cov.setSU_fromK()'")
                 self.setSU_fromK()
+                logging.debug("finished 'lmm_cov.setSU_fromK()'")
             elif self.G is not None:
+                logging.debug("starting 'lmm_cov.setSU_fromG()'")
                 self.setSU_fromG()
+                logging.debug("finished 'lmm_cov.setSU_fromG()'")
             else:
                 raise Exception("No Kernel is set. Cannot return U and S.") 
         return self.S, self.U
@@ -182,11 +186,11 @@ class LMM(object):
         get the rotated phenotype matrix
 
         Args:
-            idx_pheno    boolean numpy.array of phenotype indices to use
-                        (default None, returns all)    
+            idx_pheno boolean numpy.array of phenotype indices to use
+                        (default None, returns all)
         Returns:
-            UY        U.T.dot(Y) rotated phenotypes
-            UUY        None if kernel is full rank, otherwise Y-U.dot(U.T.dot(Y))
+            UY      U.T.dot(Y) rotated phenotypes
+            UUY     None if kernel is full rank, otherwise Y-U.dot(U.T.dot(Y))
         """
 
         if self.UY is None:
@@ -221,7 +225,7 @@ class LMM(object):
                 self.G = G
             else:
                 self.G = G.copy()
-        
+    
 
     def clear_cache(self, reset_K=True):
         """
@@ -270,7 +274,7 @@ class LMM(object):
         #TODO: ckw: is this method needed?  seems like a wrapper around findA2_2K!
         #Christoph and Chris: probably not needed
         if self.Y.shape[1] > 1:
-            print("not implemented")
+            print "not implemented"
             raise NotImplementedError("only single pheno case implemented")
 
         #if self.K0 is not None:
@@ -309,7 +313,7 @@ class LMM(object):
             dictionary containing the model parameters at the optimal a2
         '''
         if self.Y.shape[1] > 1:
-            print("not implemented")
+            print "not implemented"
             raise NotImplementedError("only single pheno case implemented")
         
         self.numcalls = 0
@@ -326,7 +330,7 @@ class LMM(object):
             #print "one objective function call took %.2f seconds elapsed" % (t1-t0)
             #import pdb; pdb.set_trace()
             return res['nLL']
-        if verbose: print("finda2")
+        if verbose: print "finda2"
         min = minimize1D(f=f, nGrid=nGridA2, minval=minA2, maxval=maxA2,verbose=False)
         #print "numcalls to innerLoopTwoKernel= " + str(self.numcalls)
         return resmin[0]
@@ -358,7 +362,7 @@ class LMM(object):
         '''
         #f = lambda x : (self.nLLeval(h2=x,**kwargs)['nLL'])
         if self.Y.shape[1] > 1:
-            print("not implemented")
+            print "not implemented"
             raise NotImplementedError("only single pheno case implemented")
         resmin = [None]
         noG1 = True
@@ -421,14 +425,14 @@ class LMM(object):
             dictionary containing the model parameters at the optimal h2
         '''
         #f = lambda x : (self.nLLeval(h2=x,**kwargs)['nLL'])
-        resmin = [None for i in range(self.Y.shape[1])]
+        resmin = [None for i in xrange(self.Y.shape[1])]
         #logging.info("starting H2 search")
         assert estimate_Bayes == False, "not implemented"
         if self.Y.shape[1] > 1:
             def f(x):
                 res = self.nLLeval(h2=x,**kwargs)
                 #check all results for local minimum:
-                for i in range(self.Y.shape[1]):
+                for i in xrange(self.Y.shape[1]):
                     if (resmin[i] is None) or (res['nLL'][i] < resmin[i]['nLL']):
                         resmin[i] = res.copy()
                         resmin[i]['nLL'] = res['nLL'][i]
@@ -454,7 +458,7 @@ class LMM(object):
                 res = self.nLLeval(h2=x,**kwargs)
                 if (resmin[0] is None) or (res['nLL'] < resmin[0]['nLL']):
                     resmin[0] = res
-                #logging.info("search\t{0}\t{1}".format(x,res['nLL']))
+                logging.debug("search\t{0}\t{1}".format(x,res['nLL']))
                 return res['nLL'][0]   
             min = minimize1D(f=f, nGrid=nGridH2, minval=minH2, maxval=maxH2)
             #logging.info("search\t{0}\t{1}".format("?",resmin[0]))
@@ -483,7 +487,7 @@ class LMM(object):
             if (resmin[0] is None):
                     resmin[0] = {'nLL':res['nLL'],'h2':np.zeros_like(res['nLL'])+res['h2']}
             else:
-                for i in range(self.Y.shape[1]):
+                for i in xrange(self.Y.shape[1]):
                     if (res['nLL'][i] < resmin[0]['nLL'][i]):
                         resmin[0]['nLL'][i] = res['nLL'][i]
                         resmin[0]['h2'][i] = res['h2']
@@ -576,9 +580,9 @@ class LMM(object):
             
             if snps.shape[0] != self.Y.shape[0]:
                 #pdb.set_trace()
-                print("shape mismatch between snps and Y")
+                print "shape mismatch between snps and Y"
             Usnps,UUsnps = self.rotate(A=snps)
-                
+        
         result = self.nLLcore(Sd=Sd, dof=dof, scale=scale, penalty=penalty, UW=UW, UUW=UUW, weightW=weightW, denom=denom, Usnps=Usnps, UUsnps=UUsnps)
         result['h2'] = h2
         result['h2_1'] = h2_1
@@ -640,7 +644,7 @@ class LMM(object):
         --------------------------------------------------------------------------
         '''
 
-        N = self.Y.shape[0] - self.linreg.D    #number of degrees of freedom
+        N = self.Y.shape[0] - self.linreg.D #number of degrees of freedom
         S,U = self.getSU()
         k = S.shape[0]
 
@@ -660,7 +664,7 @@ class LMM(object):
                     'h2':h2,
                     'scale':scale}
         UY,UUY = self.getUY(idx_pheno = idx_pheno)
-        P = UY.shape[1]    #number of phenotypes used
+        P = UY.shape[1] #number of phenotypes used
         YKY = computeAKA(Sd=Sd, denom=denom, UA=UY, UUA=UUY)
         logdetK = np.log(Sd).sum()
 
@@ -718,7 +722,7 @@ class LMM(object):
         assert Sd.shape[0] == k, "shape missmatch"
 
         UY,UUY = self.getUY(idx_pheno = idx_pheno)
-        P = UY.shape[1]    #number of phenotypes used
+        P = UY.shape[1] #number of phenotypes used
         YKY = computeAKA(Sd=Sd, denom=denom, UA=UY, UUA=UUY)
         logdetK = np.log(Sd).sum()
 
@@ -767,7 +771,7 @@ class LMM(object):
             # compute inverse efficiently
             [S_WW,U_WW] = la.eigh(WW)
             # compute S_WW^{-1} * UWX
-                        
+            
             WY = computeAKB(Sd=Sd, denom=denom, UA=UW, UUA=UUW, UB=UY, UUB=UUY)
             UWY = U_WW.T.dot(WY)
             WY = UWY / np.lib.stride_tricks.as_strided(S_WW, (S_WW.size,UWY.shape[1]), (S_WW.itemsize,0))
@@ -805,14 +809,13 @@ class LMM(object):
             variance_explained_beta = (snpsKY * beta)
             r2 = YKY[np.newaxis,:] - variance_explained_beta 
             if penalty:
-                variance_beta = r2 / (N - 1) * (snpsKsnps / ((snpsKsnps + penalty_) * (snpsKsnps + penalty_)))
-                #note that we assume the loss in DOF is 1 here, even though it is less, so the
+                variance_beta = r2 / (N - 1) * (snpsKsnps / ((snpsKsnps + penalty_) * (snpsKsnps + penalty_)))#note that we assume the loss in DOF is 1 here, even though it is less, so the
                 #variance estimate is conservative, due to N-1 for penalty case
                 variance_explained_beta *= (snpsKsnps/(snpsKsnps+penalty_)) * (snpsKsnps/(snpsKsnps + penalty_))
             else:
                 variance_beta = r2 / (N - 1) / snpsKsnps
-            fraction_variance_explained_beta = variance_explained_beta / YKY[np.newaxis,:] # variance explained by beta over total variance
-                
+                fraction_variance_explained_beta = variance_explained_beta / YKY[np.newaxis,:] # variance explained by beta over total variance
+        
         else:
             r2 = YKY
             beta = None
@@ -834,7 +837,7 @@ class LMM(object):
                         'variance_explained_beta':variance_explained_beta,
                         'fraction_variance_explained_beta':fraction_variance_explained_beta,
                         'scale':scale
-        }
+                }
         return result
 
 
@@ -897,11 +900,25 @@ def computeAKA(Sd, denom, UA, UUA=None):
     
     A.T.dot( f(K) ).dot(A)
     """
-    UAS = UA / np.lib.stride_tricks.as_strided(Sd, (Sd.size,UA.shape[1]), (Sd.itemsize,0))
-    AKA = (UAS * UA).sum(0)
-    if UUA is not None:
-        AKA += (UUA * UUA).sum(0) / denom
+    #To save memory divide the work into 10 pieces
+    piece_count = 10 if UA.shape[0] > 10 and UA.shape[1] > 1 else 1
+
+    AKA = np.zeros(UA.shape[1])
+    start0, start1 = 0, 0
+    for piece_index in xrange(piece_count):
+        end0 = UA.shape[0] * (piece_index+1) // piece_count
+        AKA += (UA[start0:end0,:] / Sd.reshape(-1,1)[start0:end0,:] * UA[start0:end0,:]).sum(0)
+        start0 = end0
+        if UUA is not None:
+            end1 = UUA.shape[0] * (piece_index+1) // piece_count
+            AKA += (UUA[start1:end1,:] * UUA[start1:end1,:]).sum(0) / denom
+            start1 = end1
     return AKA
+
+#def _elementwise_mult_and_sum(a,b,start,end):
+#    s =  (a[start:end,:] * b[start:end,:]).sum(0)
+#    return s
+
 
 if 0:
     import scipy as sp
@@ -973,19 +990,19 @@ if __name__ == "__main__":
     #snp_name = geno['rs']
 
     #loco = LeaveOneChromosomeOut(chr_ids, indices=True)
-    loco = [[list(range(0,5000)), list(range(5000,10000))]]
+    loco = [[range(0,5000), range(5000,10000)]]
 
     if 0:
         #TODO: wrap up results using pandas
         for train_snp_idx, test_snp_idx in loco:
 
-            print(len(train_snp_idx), len(test_snp_idx))
+            print len(train_snp_idx), len(test_snp_idx)
 
         
             int_snp_idx = argintersect_left(snp_pos[train_snp_idx], selected_snp_pos)
             sim_keeper_idx = np.array(train_snp_idx)[int_snp_idx]
 
-            print(sim_keeper_idx)
+            print sim_keeper_idx
 
             G_train = G[:,train_snp_idx]
             G_sim = G[:,sim_keeper_idx]
@@ -1091,7 +1108,7 @@ if __name__ == "__main__":
 
             timing1 = t1 - t0
             timing2 = t2 - t1
-            print("t1 = %.5f   t2 = %.5f" % (timing1,timing2))
+            print "t1 = %.5f   t2 = %.5f" % (timing1,timing2)
 
             #import pylab as PL
             PL.ion()

@@ -92,7 +92,7 @@ def work_item(arg_tuple):
         new_index = np.arange(G_kernel.iid_count)
         np.random.shuffle(new_index)
         E_kernel_temp = E_kernel[new_index].read()
-        E_kernel = KernelData(iid=E_kernel.iid,val=E_kernel_temp.val,parent_string="permutation {0}".format(permute_plus_index))
+        E_kernel = KernelData(iid=E_kernel.iid,val=E_kernel_temp.val,name="permutation {0}".format(permute_plus_index))
 
     pheno = pheno.read().standardize()       # defaults to Unit standardize
     G_kernel = G_kernel.read().standardize() # defaults to DiagKtoN standardize
@@ -147,7 +147,7 @@ def work_item(arg_tuple):
     else:
         #Create the G+E kernel by mixing according to a2
         val=(1-a2)*G_kernel.val + a2*E_kernel.val
-        GplusE_kernel = KernelData(iid=G_kernel.iid, val=val,parent_string="{0} G + {1} E".format(1-a2,a2))
+        GplusE_kernel = KernelData(iid=G_kernel.iid, val=val,name="{0} G + {1} E".format(1-a2,a2))
         #Don't need to standardize GplusE_kernel because it's the weighted combination of standardized kernels
 
         # Create GxE Kernel and then find the best mixing of it and GplusE
@@ -161,7 +161,7 @@ def work_item(arg_tuple):
             np.random.shuffle(new_index)
             val = pstutil.sub_matrix(val, new_index, new_index)
 
-        GxE_kernel = KernelData(iid=G_kernel.iid, val=val,parent_string="GxE") # recall that Python '*' is just element-wise multiplication
+        GxE_kernel = KernelData(iid=G_kernel.iid, val=val,name="GxE") # recall that Python '*' is just element-wise multiplication
         GxE_kernel = GxE_kernel.standardize()
 
         lmm2 = LMM()
@@ -256,7 +256,7 @@ def heritability_spatial_correction(G_kernel, spatial_coor, spatial_iid, alpha_l
     # Prepare the inputs
     ######################
 
-    from fastlmm.association.fastlmmmodel import _kernel_fixup, _pheno_fixup
+    from fastlmm.inference.fastlmm_predictor import _kernel_fixup, _pheno_fixup
     G_kernel = _kernel_fixup(G_kernel, iid_if_none=None, standardizer=Unit())  # Create a kernel from an in-memory kernel, some snps, or a text file.
     pheno = _pheno_fixup(pheno,iid_if_none=G_kernel.iid, missing='NA') # Create phenotype data from in-memory data or a text file.
 
@@ -264,9 +264,9 @@ def heritability_spatial_correction(G_kernel, spatial_coor, spatial_iid, alpha_l
         pstutil.create_directory_if_necessary(cache_folder,isfile=False)
 
     
-    jackknife_seed = seed or (hash("GplusE")%4294967295)
-    permute_plus_seed = seed or (hash("idb_gps")%4294967295)
-    permute_times_seed = seed or (hash("GxE")%4294967295)
+    jackknife_seed = seed or 1954692566L
+    permute_plus_seed = seed or 2372373100L
+    permute_times_seed = seed or 2574440128L
 
     ######################
     # Find 'alpha', the scale for distance
@@ -289,7 +289,7 @@ def heritability_spatial_correction(G_kernel, spatial_coor, spatial_iid, alpha_l
                 arg_list.append(arg_tuple)
 
         # Run "run_line" on each set of arguments and save to file
-        return_list = map_function(work_item, arg_list) if len(arg_list)>1 or always_remote else list(map(work_item, arg_list))
+        return_list = map_function(work_item, arg_list) if len(arg_list)>1 or always_remote else map(work_item, arg_list)
         return_list = [line for line in return_list if line is not None] #Remove 'None' results
         alpha_table = pd.DataFrame(return_list)
         if cache_folder is not None:
@@ -335,7 +335,7 @@ def heritability_spatial_correction(G_kernel, spatial_coor, spatial_iid, alpha_l
                     arg_list.append(arg_tuple)    
 
         # Run "run_line" on each set of arguments and save to file
-        return_list = map_function(work_item, arg_list) if len(arg_list)>1 or always_remote else list(map(work_item, arg_list))
+        return_list = map_function(work_item, arg_list) if len(arg_list)>1 or always_remote else map(work_item, arg_list)
         return_list = [line for line in return_list if line is not None] #Remove 'None' results
         jackknife_table = pd.DataFrame(return_list)
         if cache_folder is not None:
@@ -404,7 +404,7 @@ def heritability_spatial_correction(G_kernel, spatial_coor, spatial_iid, alpha_l
                 arg_list.append(arg_tuple)
 
         # Run "run_line" on each set of arguments and save to file
-        return_list = map_function(work_item, arg_list) if len(arg_list)>1 or always_remote else list(map(work_item, arg_list))
+        return_list = map_function(work_item, arg_list) if len(arg_list)>1 or always_remote else map(work_item, arg_list)
         return_list = [line for line in return_list if line is not None] #Remove 'None' results
         permplus_table = pd.DataFrame(return_list)
         if cache_folder is not None:
@@ -452,7 +452,7 @@ def heritability_spatial_correction(G_kernel, spatial_coor, spatial_iid, alpha_l
                 arg_list.append(arg_tuple)    
 
             # Run "run_line" on each set of arguments and save to file
-            return_list = map_function(work_item, arg_list) if len(arg_list)>1 or always_remote else list(map(work_item, arg_list))
+            return_list = map_function(work_item, arg_list) if len(arg_list)>1 or always_remote else map(work_item, arg_list)
             return_list = [line for line in return_list if line is not None] #Remove 'None' results
             permtime_results = pd.DataFrame(return_list)
             if cache_folder is not None:

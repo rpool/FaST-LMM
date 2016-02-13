@@ -7,7 +7,7 @@ from distutils.command.clean import clean as Clean
 import numpy
 
 # Version number
-version = '0.2.21'
+version = '0.2.23'
 
 
 def readme():
@@ -37,7 +37,7 @@ class CleanCommand(Clean):
                     or filename.endswith('.pyc')
                                 ):
                     tmp_fn = os.path.join(dirpath, filename)
-                    print("removing", tmp_fn)
+                    print "removing", tmp_fn
                     os.unlink(tmp_fn)
 
 # set up macro
@@ -93,8 +93,8 @@ setup(
         "fastlmm/util/stats",
         "fastlmm/util",
         "fastlmm",
-	],
-	package_data={"fastlmm/association" : [
+    ],
+    package_data={"fastlmm/association" : [
                        "Fastlmm_autoselect/FastLmmC.exe",
                        "Fastlmm_autoselect/libiomp5md.dll",
                        "Fastlmm_autoselect/fastlmmc",
@@ -120,9 +120,9 @@ setup(
                        "examples/toydata.snpmajor.hdf5",
                        "examples/toydataTest.phe",
                        "examples/toydataTrain.phe"
-					   ]
+                       ]
                  },
-    install_requires = ['scipy>=0.16.0', 'numpy>=1.9.3', 'pandas>=0.16.2','matplotlib>=1.4.3', 'scikit-learn>=0.16.1', 'pysnptools>=0.3.5'],
+    install_requires = ['scipy>=0.16.0', 'numpy>=1.9.3', 'pandas>=0.16.2','matplotlib>=1.4.3', 'scikit-learn>=0.16.1', 'pysnptools>=0.3.7', 'dill'],
     cmdclass = cmdclass,
     ext_modules = ext_modules,
   )

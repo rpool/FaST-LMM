@@ -45,9 +45,9 @@ class TestHeritabilitySpatialCorrection(unittest.TestCase):
         half = self.pheno_whole.read().val
         pheno = SnpData(iid=self.pheno_whole.iid,sid=["pheno0","pheno1"],val=np.c_[half,half])
 
-        spatial_coor = [[i,-i] for i in range(self.snpreader_whole.iid_count)]
+        spatial_coor = [[i,-i] for i in xrange(self.snpreader_whole.iid_count)]
         alpha_list = alpha_list_big=[int(v) for v in np.logspace(2,np.log10(4000), 2)]
-        dataframe = heritability_spatial_correction(self.snpreader_whole,spatial_coor,self.snpreader_whole.iid,alpha_list,pheno,jackknife_count=2,permute_plus_count=1,permute_times_count=1,just_testing=True)
+        dataframe = heritability_spatial_correction(self.snpreader_whole,spatial_coor,self.snpreader_whole.iid,alpha_list,2,pheno,jackknife_count=2,permute_plus_count=1,permute_times_count=1,just_testing=True)
 
         dataframe.to_csv(tmpOutfile,sep="\t",index=False)
         referenceOutfile = TestFeatureSelection.reference_file("heritability_spatial_correction/"+fn)
@@ -64,9 +64,9 @@ class TestHeritabilitySpatialCorrection(unittest.TestCase):
 
         snpreader = self.snpreader_whole[:10,:]
 
-        spatial_coor = [[i,-i] for i in range(snpreader.iid_count)]
+        spatial_coor = [[i,-i] for i in xrange(snpreader.iid_count)]
         alpha_list = alpha_list_big=[int(v) for v in np.logspace(2,np.log10(4000), 2)]
-        dataframe = heritability_spatial_correction(snpreader,spatial_coor,snpreader.iid,alpha_list,self.pheno_whole,jackknife_count=2,permute_plus_count=1,permute_times_count=1,just_testing=False)
+        dataframe = heritability_spatial_correction(snpreader,spatial_coor,snpreader.iid,alpha_list,2,self.pheno_whole,jackknife_count=2,permute_plus_count=1,permute_times_count=1,just_testing=False)
 
         dataframe.to_csv(tmpOutfile,sep="\t",index=False)
         referenceOutfile = TestFeatureSelection.reference_file("heritability_spatial_correction/"+fn)
@@ -94,7 +94,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
 
     # this import is needed for the runner
-    from fastlmm.association.tests.test_heritability_spatical_correction import TestHeritabilitySpatialCorrection
+    #from fastlmm.association.tests.test_heritability_spatical_correction import TestHeritabilitySpatialCorrection
     suites = unittest.TestSuite([getTestSuite()])
 
     r = unittest.TextTestRunner(failfast=False)

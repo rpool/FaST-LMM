@@ -14,13 +14,13 @@ class SnpAndSetNameCollection(object):  # implements ISnpSetList
         self.filename = filename
         logging.info("Reading {0}".format(filename))
         import pandas as pd
-        snp_and_setname_sequence = pd.read_csv(filename,delimiter = '\s',index_col=False)
+        snp_and_setname_sequence = pd.read_csv(filename,delimiter = '\s',index_col=False,engine='python')
 
         from collections import defaultdict
         setname_to_snp_list = defaultdict(list)
         for snp,gene in snp_and_setname_sequence.itertuples(index=False):
             setname_to_snp_list[gene].append(snp)
-        self.bigToSmall = sorted(iter(setname_to_snp_list.items()), key = lambda gene_snp_list:-len(gene_snp_list[1]))
+        self.bigToSmall = sorted(setname_to_snp_list.iteritems(), key = lambda (gene, snp_list):-len(snp_list))
 
     def addbed(self, bed):
         return SnpAndSetNameCollectionPlusBed(self,bed)

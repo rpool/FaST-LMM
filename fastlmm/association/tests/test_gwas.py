@@ -118,8 +118,8 @@ class TestGwas(unittest.TestCase):
         snp_pos = snp_reader.rs
 
         
-        idx_sim = list(range(0, 5000))
-        idx_test = list(range(5000, 10000))
+        idx_sim = range(0, 5000)
+        idx_test = range(5000, 10000)
 
         snp_pos_sim = snp_pos[idx_sim]
         snp_pos_test = snp_pos[idx_test]
@@ -145,7 +145,7 @@ class TestGwas(unittest.TestCase):
         if False:
             import pylab
             pylab.plot(np.log(gwas_c_reml.p_values), np.log(gwas_f.p_values_F), "x")
-            pylab.plot(list(range(-66,0,1)), list(range(-66,0,1)))
+            pylab.plot(range(-66,0,1), range(-66,0,1))
             pylab.show()
 
         # we compare lmm_cov.py to fastlmmc with REML=False
@@ -161,7 +161,7 @@ class TestGwas(unittest.TestCase):
         from pysnptools.snpreader import Bed as BedSnpReader
         from fastlmm.association.single_snp import single_snp
         snpreader = BedSnpReader(bed_fn)
-        frame = single_snp(test_snps=snpreader[:,idx_test], pheno=pheno_fn, G0=snpreader[:,idx_sim],h2=1.0/(delta+1.0))
+        frame = single_snp(test_snps=snpreader[:,idx_test], pheno=pheno_fn, G0=snpreader[:,idx_sim],h2=1.0/(delta+1.0),leave_out_one_chrom=False)
         sid_list,pvalue_list = frame['SNP'].as_matrix(),frame['PValue'].as_matrix()
         np.testing.assert_allclose(gwas_f.sorted_p_values_F, pvalue_list, rtol=1e-10)
 
@@ -175,7 +175,7 @@ class TestGwas(unittest.TestCase):
         gwas_c_reml_search = GwasTest(bed_fn, pheno_fn, snp_pos_sim, snp_pos_test, delta=None, REML=True)
         gwas_c_reml_search.run_gwas()
 
-        frame_search = single_snp(test_snps=snpreader[:,idx_test], pheno=pheno_fn, G0=snpreader[:,idx_sim],h2=None)
+        frame_search = single_snp(test_snps=snpreader[:,idx_test], pheno=pheno_fn, G0=snpreader[:,idx_sim],h2=None,leave_out_one_chrom=False)
         _,pvalue_list_search = frame_search['SNP'].as_matrix(),frame_search['PValue'].as_matrix()
 
         p_vals_by_genomic_pos = frame_search.sort(["Chr", "ChrPos"])["PValue"].tolist()
@@ -293,7 +293,7 @@ class GwasPrototype(object):
         assert self.lmm != None
         self.precompute_UX(self.X)
 
-        for idx in range(self.n_test):
+        for idx in xrange(self.n_test):
 
             self.set_current_UX(idx)
             res = self.lmm.nLLeval(delta=self.delta, REML=self.REML)
@@ -318,7 +318,7 @@ class GwasPrototype(object):
 
         assert len(self.res_alt) == self.n_test
 
-        for idx in range(self.n_test):
+        for idx in xrange(self.n_test):
             test_statistic = self.ll_alt[idx] - self.ll_null
             self.p_values[idx] = stats.chi2.sf(2.0 * test_statistic, degrees_of_freedom)
 
@@ -337,7 +337,7 @@ class GwasPrototype(object):
         pylab.semilogy(self.p_values)
         pylab.show()
 
-        dummy = [self.res_alt[idx]["nLL"] for idx in range(self.n_test)]
+        dummy = [self.res_alt[idx]["nLL"] for idx in xrange(self.n_test)]
         pylab.hist(dummy, bins=100)
         pylab.title("neg likelihood")
         pylab.show()

@@ -8,6 +8,7 @@ import sys
 import matplotlib
 matplotlib.use('Agg') #This lets it work even on machines without graphics displays
 import matplotlib.pyplot as plt
+import time
 
 def thin_results_file(myfile,dup_postfix="v2"):
     '''
@@ -27,7 +28,7 @@ def thin_results_file(myfile,dup_postfix="v2"):
             dup_ind.append(i)                  
 
     sets_nodup = sets[nodup_ind]
-    print("%i reps, and %i non-reps" % (len(dup_ind),len(nodup_ind)))
+    print "%i reps, and %i non-reps" % (len(dup_ind),len(nodup_ind))
     return sets_nodup
 
 def compare_files(file1,file2,tol=1e-8,delimiter="\t"):
@@ -103,8 +104,8 @@ def compare_mixed_files(file1,file2,tol=1e-8,delimiter="\t"):
         #file contains just a single column.
         return sp.all(dat1==dat2), "single column result doesn't match exactly ('{0}')".format(file1)
 
-    for r in range(r_count):
-        for c in range(c_count):
+    for r in xrange(r_count):
+        for c in xrange(c_count):
             val1 = dat1[r,c]
             val2 = dat2[r,c]
             if val1!=val2:
@@ -188,7 +189,7 @@ def standardize_col(dat,meanonly=False):
             if colstd[c]>1e-6:
                 datimp[:,c]=datimp[:,c]/colstd[c]
             else:
-                print("warning: colstd=" + colstd[c] + " during normalization")
+                print "warning: colstd=" + colstd[c] + " during normalization"
         nmissing[c]=float(sp.isnan(dat[:,c]).sum())
     fracmissing=nmissing/dat.shape[0]         
     return datimp,fracmissing
@@ -243,18 +244,18 @@ def intersect_ids(idslist,sep="Q_Q"):
                     if ~observed[l]:
                         raise Exception("first list must be non-empty")
                     else:
-                        for i in range(id_list.shape[0]):
+                        for i in xrange(id_list.shape[0]):
                             id=id_list[i,0] +sep+ id_list[i,1]
                             entry=sp.zeros(L)*sp.nan #id_list to contain the index for this id, for all lists provided
                             entry[l]=i                 #index for the first one
                             id2ind[id]=entry
                 elif observed[l]:
-                    for i in range(id_list.shape[0]):
+                    for i in xrange(id_list.shape[0]):
                         id=id_list[i,0] +sep+ id_list[i,1]
-                        if id in id2ind:
+                        if id2ind.has_key(id):
                             id2ind[id][l]=i
 
-    indarr=sp.array(list(id2ind.values()),dtype='float')  #need float because may contain NaNs
+    indarr=sp.array(id2ind.values(),dtype='float')  #need float because may contain NaNs
     indarr[:,~observed]=-1                          #replace all Nan's from empty lists to -1
     inan = sp.isnan(indarr).any(1)                  #find any rows that contain at least one Nan
     indarr=indarr[~inan]                            #keep only rows that are not NaN
@@ -309,7 +310,7 @@ def datestamp(appendrandom=False):
 #        index += 1
 #        yield item, index
 
-def create_directory_if_necessary(name, isfile=True):    
+def create_directory_if_necessary(name, isfile=True, robust=False):
     import os
     if isfile:
         directory_name = os.path.dirname(name)
@@ -317,11 +318,29 @@ def create_directory_if_necessary(name, isfile=True):
         directory_name = name
 
     if directory_name != "":
-        try:
-            os.makedirs(directory_name)
-        except OSError as e:
-            if not os.path.isdir(directory_name):
+        if not robust:
+            try:
+                os.makedirs(directory_name)
+            except OSError, e:
+                if not os.path.isdir(directory_name):
+                    raise Exception("not valid path: '{0}'. (Working directory is '{1}'".format(directory_name,os.getcwd()))
+        else:
+            is_ok = False
+            for i in xrange(10):
+                try:
+                    os.makedirs(directory_name)
+                    is_ok = True
+                    break
+                except OSError, e:
+                    if not os.path.isdir(directory_name):
+                        warnings.warn("creating directory robust=True, try#{0}, error: not valid path: '{1}'. (Working directory is '{2}'".format(i, directory_name,os.getcwd()))
+                        time.sleep(10) ; #make random?
+                    else:
+                        is_ok = True
+                        break
+            if not is_ok:
                 raise Exception("not valid path: '{0}'. (Working directory is '{1}'".format(directory_name,os.getcwd()))
+
 
 def which(vec):
     '''
@@ -350,7 +369,7 @@ def which_opposite(vec):
     index of the last True from the bool vector vec
     ----------------------------------------------------------------------
     '''
-    for i in reversed(range(len(vec))):
+    for i in reversed(xrange(len(vec))):
         item = vec[i]
         if (item):
             return(i)
@@ -363,7 +382,7 @@ def generatePermutation(numbersamples,randomSeedOrState):
     if isinstance(randomSeedOrState,RandomState):
         randomstate = randomSeedOrState
     else:
-        randomstate = RandomState(int(randomSeedOrState % sys.maxsize))
+        randomstate = RandomState(int(randomSeedOrState % sys.maxint))
 
     perm = randomstate.permutation(numbersamples)
     return perm
@@ -386,7 +405,7 @@ def excludeinds(pos0, pos1, mindist = 10.0,idist = 2):
     chromosomes1 = sp.unique(pos1[:,0])
     i_exclude = sp.zeros(pos0[:,0].shape[0],dtype = 'bool')
     if (mindist>=0.0):
-        for ichr in range(chromosomes1.shape[0]):
+        for ichr in xrange(chromosomes1.shape[0]):
             i_SNPs1_chr=pos1[:,0] == chromosomes1[ichr]
             i_SNPs0_chr=pos0[:,0] == chromosomes1[ichr]
             pos1_ = pos1[i_SNPs1_chr,idist]
@@ -420,7 +439,7 @@ def dotDotRange(dotDotString):
             yield start
         else:
             lastInclusive = int(parts[1])
-            for i in range(start,lastInclusive+1):
+            for i in xrange(start,lastInclusive+1):
                 yield i
 
 
@@ -479,12 +498,12 @@ def manhattan_plot(chr_pos_pvalue_array,pvalue_line=None,plot_threshold=1.0,vlin
 
     :Example:
 
-    >>> from fastlmm.association import single_snp_leave_out_one_chrom
+    >>> from fastlmm.association import single_snp
     >>> from pysnptools.snpreader import Bed
     >>> import matplotlib.pyplot as plt
     >>> import fastlmm.util.util as flutil
     >>> pheno_fn = "../feature_selection/examples/toydata.phe"
-    >>> results_dataframe = single_snp_leave_out_one_chrom(test_snps="../feature_selection/examples/toydata.5chrom", pheno=pheno_fn, h2=.2)
+    >>> results_dataframe = single_snp(test_snps="../feature_selection/examples/toydata.5chrom", pheno=pheno_fn, h2=.2)
     >>> chromosome_starts = flutil.manhattan_plot(results_dataframe.as_matrix(["Chr", "ChrPos", "PValue"]),pvalue_line=1e-7)
     >>> #plt.show()
 
@@ -519,7 +538,7 @@ def manhattan_plot(chr_pos_pvalue_array,pvalue_line=None,plot_threshold=1.0,vlin
         if np.any(idx_significant):
             y_significant = y[idx_significant]
             chr_pos_list_significant = chr_pos_list[idx_significant]
-            for i in range(len(chr_pos_list_significant)):
+            for i in xrange(len(chr_pos_list_significant)):
                 plt.axvline(x=chr_pos_list_significant[i],ymin = 0.0, ymax = y_significant[i], color = 'r',alpha=0.8)
 
     plt.scatter(chr_pos_list,y,marker=marker,c=_color_list(array[:,0],rle),edgecolor='none',s=y/max_y*20+0.5, alpha=alpha)
