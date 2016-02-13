@@ -166,7 +166,7 @@ if __name__ == '__main__':
                                     fastlmm.inference.tests.test_linear_regression.getTestSuite(),
                                     ])
     
-    if False: #Standard test run
+    if True: #Standard test run
         r = unittest.TextTestRunner(failfast=False)
         r.run(suites)
     else: #Cluster test run
