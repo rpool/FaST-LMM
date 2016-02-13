@@ -264,9 +264,9 @@ def heritability_spatial_correction(G_kernel, spatial_coor, spatial_iid, alpha_l
         pstutil.create_directory_if_necessary(cache_folder,isfile=False)
 
     
-    jackknife_seed = seed or 1954692566L
-    permute_plus_seed = seed or 2372373100L
-    permute_times_seed = seed or 2574440128L
+    jackknife_seed = seed or (hash("GplusE")%4294967295)
+    permute_plus_seed = seed or (hash("idb_gps")%4294967295)
+    permute_times_seed = seed or (hash("GxE")%4294967295)
 
     ######################
     # Find 'alpha', the scale for distance
