@@ -251,7 +251,7 @@ If not given, the function is run locally.</li>
 <dt id="fastlmm.association.single_snp_select">
 <code class="descclassname">fastlmm.association.</code><code class="descname">single_snp_select</code><span class="sig-paren">(</span><em>test_snps</em>, <em>pheno</em>, <em>G=None</em>, <em>covar=None</em>, <em>k_list=None</em>, <em>n_folds=10</em>, <em>just_return_selected_snps=False</em>, <em>seed=0</em>, <em>output_file_name=None</em>, <em>GB_goal=None</em>, <em>force_full_rank=False</em>, <em>force_low_rank=False</em>, <em>h2=None</em>, <em>runner=None</em><span class="sig-paren">)</span><a class="headerlink" href="#fastlmm.association.single_snp_select" title="Permalink to this definition">¶</a></dt>
 <dd><p>Function performing single SNP GWAS based on covariates (often PCs) and a similarity matrix constructed of the top <em>k</em> SNPs where
-SNPs are ordered via <code class="xref py py-meth docutils literal"><span class="pre">single_snp_linreg()</span></code> and <em>k</em> is determined via out-of-sample prediction. Will reorder and intersect IIDs as needed.</p>
+SNPs are ordered via the PValue from <code class="xref py py-meth docutils literal"><span class="pre">single_snp_linreg()</span></code> and <em>k</em> is determined via out-of-sample prediction. Will reorder and intersect IIDs as needed.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />

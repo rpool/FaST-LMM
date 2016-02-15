@@ -154,7 +154,7 @@ def single_snp_all_plus_select(test_snps, pheno, G=None, covar=None,
                  GB_goal=None, force_full_rank=False, force_low_rank=False, mixing=None, h2=None, do_plot=False, runner=None):
     """
     Function performing single SNP GWAS based on two kernels. The first kernel is based on all SNPs. The second kernel is a similarity matrix
-    constructed of the top *k* SNPs where the SNPs are ordered via :meth:`.single_snp` and *k* is determined via out-of-sample prediction.
+    constructed of the top *k* SNPs where the SNPs are ordered via the PValue from :meth:`.single_snp` and *k* is determined via out-of-sample prediction.
     All work is done via 'leave_out_one_chrom', that one chromosome is tested and the kernels are constructed from the other chromosomes.
     Will reorder and intersect IIDs as needed.
 

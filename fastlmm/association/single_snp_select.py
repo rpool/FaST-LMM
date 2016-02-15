@@ -41,7 +41,7 @@ def single_snp_select(test_snps, pheno, G=None, covar=None,
                  GB_goal=None, force_full_rank=False, force_low_rank=False, h2=None, runner=None):
     """
     Function performing single SNP GWAS based on covariates (often PCs) and a similarity matrix constructed of the top *k* SNPs where
-    SNPs are ordered via :meth:`.single_snp_linreg` and *k* is determined via out-of-sample prediction. Will reorder and intersect IIDs as needed.
+    SNPs are ordered via the PValue from :meth:`.single_snp_linreg` and *k* is determined via out-of-sample prediction. Will reorder and intersect IIDs as needed.
 
     :param test_snps: SNPs to test. Can be any :class:`.SnpReader`. If you give a string, it should be the base name of a set of PLINK Bed-formatted files.
            (For backwards compatibility can also be dictionary with keys 'vals', 'iid', 'header')
