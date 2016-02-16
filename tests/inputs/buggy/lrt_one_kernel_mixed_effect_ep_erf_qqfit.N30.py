@@ -15,11 +15,11 @@ distributable = FastLmmSet(
     qmax=0.1,      #use the top 10% of null distrib test statistics to fit the null distribution
     write_lrtperm=True,
     datestamp=None,
-	nullModel={'effect':'mixed', 'link':'erf',
+    nullModel={'effect':'mixed', 'link':'erf',
                'approx':'ep', 'penalty':None},
     altModel={'effect':'mixed', 'link':'erf',
               'approx':'ep', 'penalty':None},
     log = logging.CRITICAL,
-	detailed_table = False,
-	signal_ratio = False
+    detailed_table = False,
+    signal_ratio = False
     )

@@ -71,7 +71,7 @@ def epistasis(test_snps,pheno,G0, G1=None, mixing=0.0, covar=None,output_file_na
                 If not given, no cache file will be used.
                 If given and file does not exists, will write precomputation values to file.
                 If given and file does exists, will read precomputation values from file.
-                The file contains the U and S matrix from the decomposition of the training matrix. It is in Python's np.savez (*.npz) format.
+                The file contains the U and S matrix from the decomposition of the training matrix. It is in Python's np.savez (\*.npz) format.
                 Calls using the same cache file should have the same 'G0' and 'G1'
     :type cache_file: file name
 

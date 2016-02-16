@@ -35,6 +35,7 @@ def run_all_in_memory(work):
     if callable(work):
         return work()
     else:
+        assert hasattr(work,"work_sequence"), "Your work item doesn't have a work_sequence. This can be caused by having 'map_reduce(nested=something,...)' where you should have 'map_reduce(mapper=something,...)' because the 'something' is not a nested 'map_reduce'"
         work_sequence = work.work_sequence()
         result_sequence = work_sequence_to_result_sequence(work_sequence)
         return work.reduce(result_sequence)
@@ -55,7 +56,10 @@ def shape_to_desired_workcount(distributable, taskcount):
         distributable = BatchUpWork(distributable, workcount, taskcount)
     else:
        if workcount < taskcount:
-            distributable = ExpandWork(distributable, workcount, taskcount)
+           if workcount == 0:
+                distributable = MakeWork(distributable,taskcount)
+           else:
+                distributable = ExpandWork(distributable, workcount, taskcount)
     return distributable
 
 def run_one_task(original_distributable, taskindex, taskcount, workdirectory):
@@ -71,7 +75,7 @@ def run_one_task(original_distributable, taskindex, taskcount, workdirectory):
 
     if shaped_distributable.work_count != taskcount : raise Exception("Assert: expect workcount == taskcount")
 
-    util.create_directory_if_necessary(workdirectory, isfile=False)
+    util.create_directory_if_necessary(workdirectory, isfile=False, robust=True)
 
     if (taskindex < taskcount):
         doMainWorkForOneIndex(shaped_distributable, taskcount, taskindex, workdirectory)
@@ -113,6 +117,8 @@ def work_sequence_from_disk(workdirectory, taskAndWorkcount):
                 result = pickle.load(f)
             except Exception, detail:
                 raise Exception("Error trying to unpickle '{0}'. {1}".format(task_file_name,detail))
+        if taskindex % 100 == 0:
+            logging.info("About to yield result {0} of {1}".format(taskindex,taskAndWorkcount))
         yield result
 
 
@@ -196,15 +202,15 @@ class BatchUpWork(object): # implements IDistributable
 
 class ExpandWork(object): # implements IDistributable
     def __init__(self, distributable, workcount, taskcount):
-        assert 0 <= workcount, "Expect workcount to be at least 1"
-        assert workcount < taskcount, "ExpandWord expects workcount to be less than taskcount"
+        assert 1 <= workcount, "Expect workcount to be at least 1"
+        assert workcount < taskcount, "ExpandWork expects workcount to be less than taskcount"
         self.sub_distributable = distributable
         self.sub_workcount = workcount
         self._workcount = taskcount
         import math
-        self.floor = taskcount//workcount
-        self.excess = taskcount - self.floor * workcount
-        self.extra_index = (self.floor + 1) * self.excess
+        self.floor = taskcount//workcount                 #all work gets this many tasks
+        self.excess = taskcount - self.floor * workcount  #but there are this many extra tasks
+        self.extra_index = (self.floor + 1) * self.excess #tasks before here, get one extra task
 
         if hasattr(distributable,"work_sequence_range"):
             self.work_sequence_range = self._work_sequence_range
@@ -332,7 +338,8 @@ class ExpandWork(object): # implements IDistributable
                 shaped_distributable = shape_to_desired_workcount(sub_work, expand_to)
                 sub_result = SubGen(result_sequence,expand_to)
                 result = shaped_distributable.reduce(sub_result)
-                yield result
+                if not hasattr(shaped_distributable,"suppress_yield"):
+                    yield result
                 workIndex += expand_to
             else:
                 yield result_sequence.next()
@@ -346,7 +353,7 @@ class ExpandWork(object): # implements IDistributable
         if workIndex != self._workcount : raise Exception("Assert: expect len(result_sequence) to match workcount")
         try:
             result_sequence.next() #should get an StopIternation here, which will be ignored.
-            raise Exception("Assert: expect len(result_sequence) to match workcount")
+            raise Exception("Assert: expect len(result_sequence) to match workcount. This can be caused by a 'reducer' that doesn't pull every input from its input sequence.")
         except StopIteration:
             pass #do nothing
 
@@ -358,6 +365,33 @@ class ExpandWork(object): # implements IDistributable
     #optional
     def __str__(self):
         return "{0}({1},{2},{3})".format(self.__class__.__str__,self.sub_distributable,self.sub_workcount,self._workcount)
+
+
+class MakeWork(object): # implements IDistributable
+    def __init__(self, distributable, taskcount):
+        self._workcount = taskcount
+        self.sub_distributable = distributable
+
+    suppress_yield = None #Just defining it is enough. The value doesn't matter.
+    
+    @property
+    def work_count(self):
+        return self._workcount
+
+    def work_sequence_range(self,start,end):
+        for i in xrange(start,end):
+            yield lambda: None
+
+    def work_sequence(self):
+        return self._work_sequence_range(0,self.work_count)
+
+    def reduce(self, result_sequence):
+        for result in result_sequence: #We iterate through, just so everything is accounted for
+            pass
+        return "This return value should always be ignored"
+
+    def __str__(self):
+        return "{0}({1})".format(self.__class__.__str__,self._workcount)
 
 
 class SubGen:

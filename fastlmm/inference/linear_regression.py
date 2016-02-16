@@ -1,3 +1,211 @@
+import numpy as np
+import logging
+import unittest
+import os
+import scipy.linalg as LA
+import time
+from sklearn.utils import safe_sqr, check_array
+from scipy import stats
+
+from pysnptools.snpreader import Bed,Pheno
+from pysnptools.snpreader import SnpData,SnpReader
+from pysnptools.kernelreader import KernelNpz
+from pysnptools.kernelreader import SnpKernel
+from pysnptools.kernelreader import KernelReader
+from pysnptools.kernelreader import Identity as KernelIdentity
+import pysnptools.util as pstutil
+from pysnptools.standardizer import DiagKtoN,UnitTrained
+from pysnptools.standardizer import Unit
+from pysnptools.util import intersect_apply
+from pysnptools.standardizer import Standardizer
+from fastlmm.inference.lmm import LMM
+from fastlmm.inference.fastlmm_predictor import _pheno_fixup
+from fastlmm.inference import FastLMM
+from pysnptools.standardizer import Identity as StandardizerIdentity
+from scipy.stats import multivariate_normal
+from fastlmm.util.pickle_io import load, save
+
+# make FastLmm use this when there are no SNPs or K is Identity?
+class LinearRegression(object):
+    '''
+    A linear regression predictor, that works like the FastLMM in fastlmm_predictor.py, but that expects all similarity matrices to be identity. 
+
+    **Constructor:**
+        :Parameters: * **covariate_standardizer** (:class:`Standardizer`) -- The PySnpTools standardizer to be apply to X, the covariate data. Some choices include :class:`Standardizer.Unit` (Default. Fills missing with zero) and :class:`Standardizer.Identity` (do nothing)
+
+        :Example:
+
+        >>> import numpy as np
+        >>> import logging
+        >>> from pysnptools.snpreader import Pheno
+        >>> from fastlmm.inference import LinearRegression
+        >>> logging.basicConfig(level=logging.INFO)
+        >>> cov = Pheno("../feature_selection/examples/toydata.cov")
+        >>> pheno_fn = "../feature_selection/examples/toydata.phe"
+        >>> train_idx = np.r_[10:cov.iid_count] # iids 10 and on
+        >>> test_idx  = np.r_[0:10] # the first 10 iids
+        >>> linreg = LinearRegression()
+        >>> #We give it phenotype information for extra examples, but it reorders and intersects the examples, so only training examples are used. 
+        >>> _ = linreg.fit(X=cov[train_idx,:],y=pheno_fn) 
+        >>> mean, covariance = linreg.predict(X=cov[test_idx,:])
+        >>> print mean.iid[0], round(mean.val[0],7), round(covariance.val[0,0],7)
+        ['per0' 'per0'] 0.1518764 0.9043703
+        >>> nll = linreg.score(X=cov[test_idx,:],y=pheno_fn)
+        >>> print round(nll,7)
+        13.6688448
+
+
+        '''
+    def __init__(self,covariate_standardizer=Unit()):
+        self.covariate_standardizer = covariate_standardizer
+        self.is_fitted = False
+
+    def fit(self, X=None, y=None, K0_train=None, K1_train=None, h2=None, mixing=None):
+        """
+        Method for training a :class:`FastLMM` predictor. If the examples in X, y, K0_train, K1_train are not the same, they will be reordered and intersected.
+
+        :param X: training covariate information, optional: 
+          If you give a string, it should be the file name of a PLINK phenotype-formatted file.
+        :type X: a PySnpTools :class:`SnpReader` (such as :class:`Pheno` or :class:`SnpData`) or string.
+
+        :param y: training phenotype:
+          If you give a string, it should be the file name of a PLINK phenotype-formatted file.
+        :type y: a PySnpTools :class:`SnpReader` (such as :class:`Pheno` or :class:`SnpData`) or string.
+
+        :param K0_train: Must be None. Represents the identity similarity matrix.
+        :type K0_train: None
+
+        :param K1_train: Must be None. Represents the identity similarity matrix.
+        :type K1_train: :class:`.SnpReader` or a string or :class:`.KernelReader`
+
+        :param h2: Ignored. Optional.
+        :type h2: number
+
+        :param mixing: Ignored. Optional.
+        :type mixing: number
+
+        :rtype: self, the fitted Linear Regression predictor
+        """
+        self.is_fitted = True
+        assert K0_train is None # could also accept that ID or no snps
+        assert K1_train is None # could also accept that ID or no snps
+
+        assert y is not None, "y must be given"
+
+        y = _pheno_fixup(y)
+        assert y.sid_count == 1, "Expect y to be just one variable"
+        X = _pheno_fixup(X, iid_if_none=y.iid)
+
+        X, y  = intersect_apply([X, y])
+        y = y.read()
+        X, covar_unit_trained = X.read().standardize(self.covariate_standardizer,return_trained=True)
+
+        # add a column of 1's to cov to increase DOF of model (and accuracy) by allowing a constant offset
+        X = SnpData(iid=X.iid,
+                                sid=FastLMM._new_snp_name(X),
+                                val=np.c_[X.val,np.ones((X.iid_count,1))])
+
+
+        lsqSol = np.linalg.lstsq(X.val, y.val[:,0])
+        bs=lsqSol[0] #weights
+        r2=lsqSol[1] #squared residuals
+        D=lsqSol[2]  #rank of design matrix
+        N=y.iid_count
+
+        self.beta = bs
+        self.ssres = float(r2)
+        self.sstot = ((y.val-y.val.mean())**2).sum()
+        self.covar_unit_trained = covar_unit_trained
+        self.iid_count = X.iid_count
+        self.covar_sid = X.sid
+        self.pheno_sid = y.sid
+        return self
+    
+
+    def predict(self,X=None,K0_whole_test=None,K1_whole_test=None,iid_if_none=None):
+        """
+        Method for predicting from a fitted :class:`FastLMM` predictor.
+        If the examples in X, K0_whole_test, K1_whole_test are not the same, they will be reordered and intersected.
+
+        :param X: testing covariate information, optional: 
+          If you give a string, it should be the file name of a PLINK phenotype-formatted file.
+        :type X: a PySnpTools :class:`SnpReader` (such as :class:`Pheno` or :class:`SnpData`) or string.
+
+        :param K0_whole_test: Must be None. Represents the identity similarity matrix.
+        :type K0_whole_test: None
+
+        :param K1_whole_test: Must be None. Represents the identity similarity matrix.
+        :type K1_whole_test: :class:`.SnpReader` or a string or :class:`.KernelReader`
+
+        :param iid_if_none: Examples to predict for if no X, K0_whole_test, K1_whole_test is provided.
+        :type iid_if_none: an ndarray of two strings
+
+        :rtype: A :class:`SnpData` of the means and a :class:`KernelData` of the covariance
+        """
+
+        assert self.is_fitted, "Can only predict after predictor has been fitted"
+        assert K0_whole_test is None or isinstance(K0_whole_test,KernelIdentity) # could also accept no snps
+        assert K1_whole_test is None or isinstance(K1_whole_test,KernelIdentity) # could also accept no snps
+
+        X = _pheno_fixup(X,iid_if_none=iid_if_none)
+        X = X.read().standardize(self.covar_unit_trained)
+
+        # add a column of 1's to cov to increase DOF of model (and accuracy) by allowing a constant offset
+        X = SnpData(iid=X.iid,
+                              sid=FastLMM._new_snp_name(X),
+                              val=np.c_[X.read().val,np.ones((X.iid_count,1))])
+        assert np.array_equal(X.sid,self.covar_sid), "Expect covar sids to be the same in train and test."
+
+        pheno_predicted = X.val.dot(self.beta).reshape(-1,1)
+        ret0 = SnpData(iid = X.iid, sid=self.pheno_sid,val=pheno_predicted,pos=np.array([[np.nan,np.nan,np.nan]]),name="linear regression Prediction") #!!!replace 'parent_string' with 'name'
+
+        from pysnptools.kernelreader import KernelData
+        ret1 = KernelData(iid=X.iid,val=np.eye(X.iid_count)* self.ssres / self.iid_count)
+        return ret0, ret1
+
+    def score(self, X=None, y=None, K0_whole_test=None, K1_whole_test=None, iid_if_none=None, return_mse_too=False):
+        """
+        Method for calculating the negative log likelihood of testing examples.
+        If the examples in X,y,  K0_whole_test, K1_whole_test are not the same, they will be reordered and intersected.
+
+        :param X: testing covariate information, optional: 
+          If you give a string, it should be the file name of a PLINK phenotype-formatted file.
+        :type X: a PySnpTools :class:`SnpReader` (such as :class:`Pheno` or :class:`SnpData`) or string.
+
+        :param y: testing phenotype:
+          If you give a string, it should be the file name of a PLINK phenotype-formatted file.
+        :type y: a PySnpTools :class:`SnpReader` (such as :class:`Pheno` or :class:`SnpData`) or string.
+
+        :param K0_whole_test: Must be None. Represents the identity similarity matrix.
+        :type K0_whole_test: None
+
+        :param K1_whole_test: Must be None. Represents the identity similarity matrix.
+        :type K1_whole_test: :class:`.SnpReader` or a string or :class:`.KernelReader`
+
+        :param iid_if_none: Examples to predict for if no X, K0_whole_test, K1_whole_test is provided.
+        :type iid_if_none: an ndarray of two strings
+
+        :param return_mse_too: If true, will also return the mean squared error.
+        :type return_mse_too: bool
+
+        :rtype: a float of the negative log likelihood and, optionally, a float of the mean squared error.
+        """
+        mean0, covar0 = self.predict(K0_whole_test=K0_whole_test,K1_whole_test=K1_whole_test,X=X,iid_if_none=iid_if_none)
+        y = _pheno_fixup(y, iid_if_none=covar0.iid)
+        mean, covar, y = intersect_apply([mean0, covar0, y])
+        var = multivariate_normal(mean=mean.read(order='A',view_ok=True).val.reshape(-1), cov=covar.read(order='A',view_ok=True).val)
+        y_actual = y.read().val
+        nll = -np.log(var.pdf(y_actual.reshape(-1)))
+        if not return_mse_too:
+            return nll
+        else:
+            mse = ((y_actual-mean)**2).sum()
+            return nll, mse
+
+
+
+
+
 """
 Created on 2013-08-02
 @author: Christian Widmer <chris@shogun-toolbox.org>
@@ -13,13 +221,10 @@ https://github.com/scikit-learn/scikit-learn/blob/master/sklearn/feature_selecti
 
 """
 
-import numpy as np
-from sklearn.utils import safe_sqr, check_array
-from scipy import stats
 
 
 
-#def TESTBEFOREUSING_get_example_data():
+#def get_example_data():
 #    """
 #    load plink files
 #    """
@@ -41,10 +246,10 @@ from scipy import stats
 #    fn_pheno = dat["phenoFile"]
 #    """
 
-#    fn_bed = "../../featureSelection/examples/toydata"
-#    fn_pheno = "../../featureSelection/examples/toydata.phe"
+#    fn_bed = "../featureSelection/examples/toydata"
+#    fn_pheno = "../feature_selection/examples/toydata.phe"
 
-
+#    import pysnptools.util.pheno as pstpheno
 #    pheno = pstpheno.loadPhen(fn_pheno)
 
 #    # load data
@@ -67,7 +272,7 @@ from scipy import stats
 
 def f_regression_block(fun,X,y,blocksize=None,**args):
    """
-   runs f_regression for each block seperately (saves memory).
+   runs f_regression for each block separately (saves memory).
 
    -------------------------
    fun  : method that returns statistics,pval
@@ -261,11 +466,11 @@ def test_cov():
     np.testing.assert_array_almost_equal(pval1, pval2)
 
 
-def main():
-
-    test_cov()
-    test_bias()
-
-
 if __name__ == "__main__":
-    main()
+
+    logging.basicConfig(level=logging.INFO)
+
+    import doctest
+    doctest.testmod()
+    #test_cov()
+    #test_bias()

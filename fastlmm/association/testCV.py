@@ -168,7 +168,7 @@ class testCV(association.varcomp_test):
 
     # the effect parameter should not be used here, but I dont have a better an idea for now
     def score_nestedCV(self, G1, model, param_grid, effect, nested):
-        k_fold = cross_validation.KFold(n=self.Y.shape[0], n_folds=self.n_folds, indices=True)
+        k_fold = cross_validation.KFold(n=self.Y.shape[0], n_folds=self.n_folds)
         i_fold=0
         scores = sp.zeros(self.n_folds)
         params = list()

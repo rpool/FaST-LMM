@@ -36,11 +36,15 @@
     <PtvsTargetsFile>$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets</PtvsTargetsFile>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="computePC.py" />
     <Compile Include="compute_auto_pcs.py">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="distributable.py" />
     <Compile Include="distributabletest.py" />
+    <Compile Include="distributed_map.py" />
+    <Compile Include="est_h2.py" />
+    <Compile Include="genphen.py" />
     <Compile Include="gensnp.py" />
     <Compile Include="indirectdistributable.py" />
     <Compile Include="MetaDistributable.py" />
@@ -64,6 +68,9 @@
     <Compile Include="standardizer\Unit.py" />
     <Compile Include="standardizer\__init__.py" />
     <Compile Include="stats\chi2mixture.py" />
+    <Compile Include="mapreduce.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="stats\plotp.py" />
     <Compile Include="stats\quadform\qfc_src\__init__.py" />
     <Compile Include="stats\quadform\__init__.py" />

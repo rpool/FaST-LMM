@@ -31,7 +31,7 @@ class FeatureSelectionInSample(object):
         Parameters
         ----------
         n_folds : int
-            Numer of repeats for shuffle split
+            Number of repeats for shuffle split
 
         measure : string ("mse" or "ll")  
             Criterion to be used to measure predition accuracy

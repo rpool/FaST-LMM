@@ -9,7 +9,7 @@ import time
 #import ipdb
 
 def print_missing_info(y):
-	print str(np.isnan(y).sum().sum()) + " missing items out of " + str(np.product(y.shape)) + "=" + str(100.0*np.isnan(y).sum().sum()/np.product(y.shape)) + "%"
+    print str(np.isnan(y).sum().sum()) + " missing items out of " + str(np.product(y.shape)) + "=" + str(100.0*np.isnan(y).sum().sum()/np.product(y.shape)) + "%"
 
 
 #would be nice to make a low-mem version of this, but this requires
@@ -84,39 +84,39 @@ def lrtpvals_qqfit_file(filein, qmax=0.1):
     import ipdb; ipdb.set_trace()
 
 def lrt(stat,dof):
-	'''
-	Standard way to compute p-value when no boundary conditions
-	'''
-	pv = (st.chi2.sf(stat,dof)) 
-	return pv
+    '''
+    Standard way to compute p-value when no boundary conditions
+    '''
+    pv = (st.chi2.sf(stat,dof)) 
+    return pv
 
 def linreg_uniscan(X,y,covar=None,REML=False):
-	'''
-	Iterate through each column of X, using it in the alternative model, and otherwise, 
-	only covar/covar+bias in the null model. Y is a 1D phenotype vector
-	Output:
-		p-value, LLnull, LLalt
-	'''
-	numtests=X.shape[1]
-	print "numtests=" + str(numtests)
-	pv = np.nan*np.ones(numtests)
-	m_alt=[]
-	nullfeat = np.ones_like(y) #bias term
-	if covar is not None:		
-		nullfeat=np.hstack((nullfeat,covar))
-		
-	m_null = linreg(nullfeat,y,REML=REML)	
-	ttt0=time.time()	
-	for i in range(numtests):
-		snp = X[:,i:i+1]
-		if np.isnan(y).sum()>0: raise Exception("missing data found")
-		snp_w_nullfeat = np.hstack((snp,nullfeat))		
-		m_alt.append(linreg(snp_w_nullfeat,y,REML=REML))
-		pv[i] = lrt(-2*(m_alt[i]['nLL']-m_null['nLL']),dof=1)				
-		if i % 50000==0:
-			ttt1=time.time()
-			print "Elapsed time for %d of %d tests is %.2f seconds" % (i, numtests,(ttt1-ttt0))       
-	return pv,m_null,m_alt
+    '''
+    Iterate through each column of X, using it in the alternative model, and otherwise, 
+    only covar/covar+bias in the null model. Y is a 1D phenotype vector
+    Output:
+        p-value, LLnull, LLalt
+    '''
+    numtests=X.shape[1]
+    print "numtests=" + str(numtests)
+    pv = np.nan*np.ones(numtests)
+    m_alt=[]
+    nullfeat = np.ones_like(y) #bias term
+    if covar is not None:
+        nullfeat=np.hstack((nullfeat,covar))
+        
+    m_null = linreg(nullfeat,y,REML=REML)
+    ttt0=time.time()
+    for i in range(numtests):
+        snp = X[:,i:i+1]
+        if np.isnan(y).sum()>0: raise Exception("missing data found")
+        snp_w_nullfeat = np.hstack((snp,nullfeat))
+        m_alt.append(linreg(snp_w_nullfeat,y,REML=REML))
+        pv[i] = lrt(-2*(m_alt[i]['nLL']-m_null['nLL']),dof=1)
+        if i % 50000==0:
+            ttt1=time.time()
+            print "Elapsed time for %d of %d tests is %.2f seconds" % (i, numtests,(ttt1-ttt0))       
+    return pv,m_null,m_alt
 
 def linreg(X,y,REML=True,**kwargs):
         '''

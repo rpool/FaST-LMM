@@ -6,9 +6,8 @@
     <ProjectGuid>6d8dcdf9-3776-4e1b-a713-e9b6f2a49865</ProjectGuid>
     <ProjectHome>
     </ProjectHome>
-    <StartupFile>
-    </StartupFile>
-    <SearchPath>..\..\</SearchPath>
+    <StartupFile>tests\test_fastlmm_predictor.py</StartupFile>
+    <SearchPath>..\..;..\..\..\pysnptools</SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
     <OutputPath>.</OutputPath>
     <InterpreterId>00000000-0000-0000-0000-000000000000</InterpreterId>
@@ -20,6 +19,8 @@
     <SccProvider>SAK</SccProvider>
     <SccAuxPath>SAK</SccAuxPath>
     <SccLocalPath>SAK</SccLocalPath>
+    <LaunchProvider>Standard Python launcher</LaunchProvider>
+    <EnableNativeCodeDebugging>False</EnableNativeCodeDebugging>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <DebugSymbols>true</DebugSymbols>
@@ -34,20 +35,24 @@
     <PtvsTargetsFile>$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets</PtvsTargetsFile>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="fastlmm_predictor.py" />
     <Compile Include="linear_regression.py" />
     <Compile Include="lmm.py" />
     <Compile Include="lmm_cov.py" />
-    <Compile Include="test.py" />
+    <Compile Include="tests\test.py" />
+    <Compile Include="tests\test_linear_regression.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="tests\test_fastlmm_predictor.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="tests\__init__.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="__init__.py" />
-    <Compile Include="bingpc\ep.py" />
-    <Compile Include="bingpc\exact.py" />
-    <Compile Include="bingpc\laplace.py" />
-    <Compile Include="bingpc\likelihood.py" />
-    <Compile Include="bingpc\test.py" />
-    <Compile Include="bingpc\__init__.py" />
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="bingpc" />
+    <Folder Include="tests\" />
   </ItemGroup>
   <Import Project="$(PtvsTargetsFile)" Condition="Exists($(PtvsTargetsFile))" />
   <Import Project="$(MSBuildToolsPath)\Microsoft.Common.targets" Condition="!Exists($(PtvsTargetsFile))" />

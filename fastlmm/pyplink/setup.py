@@ -13,16 +13,16 @@ from distutils.extension import Extension
 from distutils.command.clean import clean as Clean
 
 try:
-	from Cython.Distutils import build_ext
+    from Cython.Distutils import build_ext
 except Exception:
-	print "cython needed for installation, please install cython first"
-	sys.exit()
+    print "cython needed for installation, please install cython first"
+    sys.exit()
 
 try:
-	import numpy
+    import numpy
 except Exception:
-	print "numpy needed for installation, please install numpy first"
-	sys.exit()
+    print "numpy needed for installation, please install numpy first"
+    sys.exit()
 
 
 def readme():
@@ -83,12 +83,12 @@ setup(
         "fastlmm/util/stats",
         "fastlmm/util",
         "fastlmm"
-	],
+    ],
     install_requires=['cython', 'numpy', 'scipy', 'pandas', 'scikit-learn', 'matplotlib'],
     #zip_safe=False,
     # extensions
     cmdclass = {'build_ext': build_ext, 'clean': CleanCommand},
     ext_modules = ext,
-	include_dirs = [numpy.get_include()],
+    include_dirs = [numpy.get_include()],
   )
 

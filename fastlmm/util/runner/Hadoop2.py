@@ -79,7 +79,7 @@ class Hadoop2: # implements IRunner
         with open(result_local, mode='rb') as f:
             result = pickle.load(f)
 
-        logging.info('Done: Hadoop2 runner is running a distributable. Returns {0}'.format(result))
+        #logging.info('Done: Hadoop2 runner is running a distributable. Returns {0}'.format(result))
         return result
 
     def submit_to_cluster(self, batfilename_rel_list, fileInWorkingDirectoryList, tgzList, tgzListPythonPath, tgzListPythonSettings, distributable, remotewd, run_dir_abs, run_dir_rel):
@@ -195,7 +195,7 @@ class Hadoop2: # implements IRunner
         #if stderr != "" : raise Exception("Stderr from command: '{0}'".format(stderr))
 
     def FindOrCreatePythonSettings(self, remotewd):
-        localpythonpathsetting = r"\\GCR\Scratch\RR1\eScience\.continuum" # os.path.join(os.environ.get("userprofile"),".continuum")
+        localpythonpathsetting = r"\\GCR\Scratch\B99\eScience\.continuum" # os.path.join(os.environ.get("userprofile"),".continuum")
         lastFolderName = os.path.split(os.path.normpath(localpythonpathsetting))[1]
         #util.create_directory_if_necessary(localpythonpathsetting,isfile=False)
 
