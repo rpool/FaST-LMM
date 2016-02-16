@@ -161,12 +161,16 @@ class LMM(object):
 		S,U = self.getSU()
 		N = A.shape[0]
 		D = self.linreg.D
+		A = self.linreg.regress(A)
+		# treat pathological case where a variable is explained by the covariates
+		A_std = A.std(0)
+		A[:,A_std<=1e-10] = 0.0
 		if (S.shape[0] < N - D):#lowrank case
-			A = self.linreg.regress(A)
+			# A = self.linreg.regress(A)
 			UA = self.U.T.dot(A)
 			UUA = A - U.dot(UA)
 		else:
-			#A=self.linreg.regress(A)
+			# A=self.linreg.regress(A)
 			UA = U.T.dot(A)
 			#A1 = UA=U.T.dot(A)
 			#diff = np.absolute(A1-UA).sum()
