@@ -18,7 +18,7 @@ def snp_set(
         G0 = None,
         test="lrt",
         write_lrtperm = False,
-	    nperm = 10,
+        nperm = 10,
         npermabs = None,
         mpheno=1,
         G0_fit="qq",

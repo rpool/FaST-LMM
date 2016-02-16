@@ -18,7 +18,8 @@ class LMM(object):
     K0 = G0*G0^T
     K1 = G1*G1^T
     """
-    __slots__ = ["G","G0","G1","y","X","K0","K1","K","U","S","UX","Uy","UUX","UW","UUW","UUy","pos0","pos1","a2","exclude_idx","forcefullrank","numcalls","Xstar","Kstar","Kstar_star","UKstar","UUKstar","Gstar"]
+    __slots__ = ["G","G0","G1","y","X","K0","K1","K","U","S","UX","Uy","UUX","UW","UUW","UUy","pos0","pos1","a2","exclude_idx",
+                 "forcefullrank","numcalls","Xstar","Kstar","Kstar_star","UKstar","UUKstar","Gstar","K0star","K1star","K0star_star","K1star_star"]
 
     def __init__(self,forcefullrank=False):
         '''
@@ -71,6 +72,13 @@ class LMM(object):
         if (k<N):
             self.UUX = X - self.U.dot(self.UX)
 
+    def setX2(self, X):
+        '''
+        a version of setX that doesn't assume that Eigenvalue decomposition has been done.
+        '''
+        self.X   = X
+        N=self.X.shape[0]
+
     def sety(self, y):
         '''
         set the phenotype y.
@@ -87,6 +95,14 @@ class LMM(object):
         N=self.y.shape[0]
         if (k<N):
             self.UUy = y - self.U.dot(self.Uy)
+
+    def sety2(self, y):
+        '''
+        a version of sety that doesn't assume that Eigenvalue decomposition has been done.
+        '''
+        assert y.ndim==1, "y should be 1-dimensional"
+        self.y   = y
+        N=self.y.shape[0]
 
     def setG(self, G0=None, G1=None, a2=0.0, K0=None,K1=None):
         '''
@@ -198,6 +214,19 @@ class LMM(object):
         self.a2 = a2
 
         
+    def setK2(self, K0, K1=None, a2=0.0):
+        '''
+        a version of setK that doesn't do Eigenvalue decomposition.
+        '''
+        self.K0 = K0
+        self.K1 = K1
+        logging.debug("About to mix K0 and K1")
+        if K1 is None:
+            self.K = K0
+        else:
+            self.K = (1.0-a2) * K0 + a2 * K1
+        self.a2 = a2
+
     def set_exclude_idx(self, idx):
         '''
         
@@ -590,7 +619,17 @@ class LMM(object):
                 # see e.g. Equation 3.17 in Supplement of FaST LMM paper
                 self.UUKstar = self.Kstar.T - SP.dot(self.U, self.UKstar)
    
-
+    def setTestData2(self,Xstar,K0star=None,K1star=None):
+        '''
+        a version of setTestData that doesn't assume that Eigenvalue decomposition has been done.
+        '''
+        
+        self.Xstar = Xstar
+        self.Gstar = None
+        if K1star is None:
+            self.Kstar = K0star
+        else:
+            self.Kstar = (1.0-self.a2)*K0star + self.a2*K1star
    
     def predictMean(self, beta, h2=0.0, logdelta=None, delta=None, scale=1.0):
         '''
@@ -702,24 +741,34 @@ class LMM(object):
         ystar = yfixed + yrandom
         return ystar
 
-    #def predict_mean_and_variance(self, beta, sigma2, h2, Kstar_star):
-    #    assert 0 <= h2 and h2 <= 1, "By definition, h2 must be between 0 and 1 (inclusive)"
-    #    varg = h2 * sigma2
-    #    vare = (1.-h2) * sigma2
-    #    K = np.dot(np.dot(self.U,np.eye(len(self.U)) * self.S),self.U.T) #Re-compose the Eigen value decomposition #!!!don't leave it like this
-    #    V = varg * K + vare * np.eye(len(K))
-    #    Vinv = LA.inv(V)
+    def predict_mean_and_variance(lmm, beta, sigma2, h2, Kstar_star):
+        assert 0 <= h2 and h2 <= 1, "By definition, h2 must be between 0 and 1 (inclusive)"
+        varg = h2 * sigma2
+        vare = (1.-h2) * sigma2
+        if lmm.G is not None:
+            K = np.dot(lmm.G,lmm.G.T) #!!!later this is very inefficient in memory and computation
+        else:
+            K = np.dot(np.dot(lmm.U,np.eye(len(lmm.U)) * lmm.S),lmm.U.T) #Re-compose the Eigen value decomposition #!!!later do this more efficiently
+        V = varg * K + vare * np.eye(len(K))
+        Vinv = LA.inv(V)
 
-    #    a = np.dot(varg * self.Kstar, Vinv)
+        a = np.dot(varg * lmm.Kstar, Vinv)
 
-    #    y_star = np.dot(self.Xstar,beta) + np.dot(a, self.y-SP.dot(self.X,beta)) #!!! shouldn't the 2nd dot be precomputed?
-    #    y_star = y_star.reshape(-1,1) #Make 2-d
+        y_star = np.dot(lmm.Xstar,beta) + np.dot(a, lmm.y-SP.dot(lmm.X,beta)) #!!!later shouldn't the 2nd dot be precomputed?
+        y_star = y_star.reshape(-1,1) #Make 2-d
 
-    #    var_star = (varg * Kstar_star + 
-    #                vare * np.eye(len(Kstar_star)) -
-    #                np.dot(a,
-    #                        (varg * self.Kstar.T)))
-    #    return y_star, var_star
+        var_star = (varg * Kstar_star + 
+                    vare * np.eye(len(Kstar_star)) -
+                    np.dot(a,
+                            (varg * lmm.Kstar.T)))
+        return y_star, var_star
+
+    def nLL(lmm, beta, sigma2, h2, y_actual):
+        from scipy.stats import multivariate_normal
+        y_star, var_star = predict_mean_and_variance(lmm, beta, sigma2, h2, lmm.Kstar_star)
+        var = multivariate_normal(mean=y_star.reshape(-1), cov=var_star)
+        return -np.log(var.pdf(y_actual.reshape(-1)))
+
 
     def predictVariance(self, h2=0.0, logdelta = None, delta = None, sigma2 = 1.0, Kstar_star = None):
         '''
@@ -762,7 +811,7 @@ class LMM(object):
         else:
             #Sd = (h2*self.S + (1.0-h2))*sigma2
             Sd = (h2*self.S + (1.0-h2))
-            assert False, "h2 code path not test. Plese use delta or logdelta"
+            assert False, "h2 code path not test. Please use delta or logdelta"
             #delta = 1.0/h2-1.0 #right?
             
         Sdi = 1./Sd

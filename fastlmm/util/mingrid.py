@@ -10,14 +10,13 @@ def minimize1D(f, evalgrid = None, nGrid=10, minval=0.0, maxval = 0.99999, verbo
     Brent's algorithm.
     --------------------------------------------------------------------------
     Input:
-    f(x)        : callable target function
-    evalgrid    : 1-D array prespecified grid of x-values
+    f(x)    : callable target function
+    evalgrid: 1-D array prespecified grid of x-values
     nGrid   : number of x-grid points to evaluate f(x)
     minval  : minimum x-value for optimization of f(x)
     maxval  : maximum x-value for optimization of f(x)
     brent   : boolean indicator whether to do Brent search or not.
               (default: True)
-    return_grid: return evalgrid and resultgrid? (default: False)
     --------------------------------------------------------------------------
     Output list:
     [xopt, f(xopt)]
@@ -50,7 +49,7 @@ def minimize1D(f, evalgrid = None, nGrid=10, minval=0.0, maxval = 0.99999, verbo
                 if minlocal[1]<minglobal[1]:
                     if verbose: print "found a new minimum during grid search"
                     minglobal=minlocal[0:2]
-        if verbose: print "exploring triplets with Brent search"
+        if verbose: print "exploring triplets with brent search"
         onebrent=False
         for i in xrange(resultgrid.shape[0]-2):#if any triplet is found, where the inner point is a local optimum expand search
             if (resultgrid[i+1]<resultgrid[i+2]) and (resultgrid[i+1]<resultgrid[i]):
@@ -59,7 +58,7 @@ def minimize1D(f, evalgrid = None, nGrid=10, minval=0.0, maxval = 0.99999, verbo
                 minlocal = opt.brent(f,brack = (evalgrid[i],evalgrid[i+1],evalgrid[i+2]),full_output=True)
                 if minlocal[1]<minglobal[1]:
                     minglobal=minlocal[0:2]
-                    if verbose: print "found new minimum from Brent search"
+                    if verbose: print "found new minimum from brent search"
     if return_grid:
         return (minglobal[0], minglobal[1], evalgrid, resultgrid)
     else:

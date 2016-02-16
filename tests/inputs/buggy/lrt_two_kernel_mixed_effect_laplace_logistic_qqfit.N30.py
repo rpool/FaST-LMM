@@ -15,7 +15,7 @@ distributable = FastLmmSet(
     qmax=0.1,      #use the top 10% of null distrib test statistics to fit the null distribution
     write_lrtperm=True,
     datestamp=None,
-	nullModel={'effect':'mixed', 'link':'logistic',
+    nullModel={'effect':'mixed', 'link':'logistic',
                'approx':'laplace', 'penalty':None},
     altModel={'effect':'mixed', 'link':'logistic',
               'approx':'laplace', 'penalty':None},

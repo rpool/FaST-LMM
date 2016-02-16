@@ -269,7 +269,7 @@ class FeatureSelectionStrategy(object):
         self.run_once()
 
         # set up splitting strategy
-        kf = ShuffleSplit(len(self.y), n_iter=self.num_folds, indices=False, test_size=self.test_size, random_state=self.random_state)
+        kf = ShuffleSplit(len(self.y), n_iter=self.num_folds, test_size=self.test_size, random_state=self.random_state)
 
         fold_idx = start -1
         for (train_idx, test_idx) in islice(kf,start,stop):
@@ -639,7 +639,7 @@ class FeatureSelectionStrategy(object):
 
 def f_regression_block_load(fun, snpreader, standardizer, y, ind_idx=None, blocksize=10000, **args):
     """
-    runs f_regression for each block seperately (saves memory).
+    runs f_regression for each block separately (saves memory).
 
     -------------------------
     fun        : method that returns statistics,pval

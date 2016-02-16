@@ -36,7 +36,7 @@ class LocalReducer: # implements IRunner
         uuencodePattern = re.compile("[0-9]+\tuu\t")
 
         for line in self.instream:
-            #e.g. 000	gAJ
+            #e.g. 000   gAJ
             if None != uuencodePattern.match(line): # reminder: python's "match" looks for match at the start of the string
                 # hack to get around info messages in stdout
                 taskindex, uu, encoded = line.split('\t')
