@@ -159,7 +159,7 @@ class GWAS(object):
         beta = res['beta']
             
         chi2stats = beta*beta/res['variance_beta']
-        chi2stats[res['beta']==0.0] = 0.0
+
         #p_values = st.chi2.sf(chi2stats,1)[:,0]
         p_values = st.f.sf(chi2stats,1,self.lmm.U.shape[0]-3)[:,0]#note that G.shape is the number of individuals and 3 is the number of fixed effects (covariates+SNP)
 
