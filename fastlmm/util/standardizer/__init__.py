@@ -1,4 +1,5 @@
 from .Beta import *
+from .Identity import *
 from .Unit import *
 
 #import warnings
@@ -45,7 +46,7 @@ def standardize_unit_python(snps, returnStats=False):
     imissX = np.isnan(snps)
     snp_sum =  np.nansum(snps,axis=0)
     n_obs_sum = (~imissX).sum(0)
-    
+
     snp_mean = (snp_sum*1.0)/n_obs_sum
     snps -= snp_mean
     snp_std = np.sqrt(np.nansum(snps**2, axis=0)/n_obs_sum)
@@ -56,7 +57,7 @@ def standardize_unit_python(snps, returnStats=False):
     snp_std[snp_std == 0.0] = 1.0
     snps /= snp_std
     snps[imissX] = 0
-    
+
     if returnStats:
         return snps,snp_mean,snp_std
 
@@ -73,7 +74,7 @@ def standardize_beta_python(snps, betaA, betaB):
     imissX = np.isnan(snps)
     snp_sum =  np.nansum(snps,axis=0)
     n_obs_sum = (~imissX).sum(0)
-    
+
     snp_mean = (snp_sum*1.0)/n_obs_sum
     snps -= snp_mean
     snp_std = np.sqrt(np.nansum(snps**2, axis=0)/n_obs_sum)
@@ -88,5 +89,5 @@ def standardize_beta_python(snps, betaA, betaB):
     maf_beta = st.beta.pdf(maf, betaA, betaB)
     snps*=maf_beta
     snps[imissX] = 0.0
-     
+
     return snps

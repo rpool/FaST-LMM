@@ -27,7 +27,9 @@ def snp_set(
         minsetsize = None,
         maxsetsize = None,
         mindist=0,
-        idist=1
+        idist=1,
+        standardizer_str='unit',
+        beta_params={'a': 1, 'b': 25}
     ):
     """
     Function performing GWAS on sets of snps
@@ -149,7 +151,9 @@ def snp_set(
         calseed = seed,
         minsetsize = minsetsize,
         maxsetsize = maxsetsize,
-        write_lrtperm = write_lrtperm
+        write_lrtperm = write_lrtperm,
+        standardizer_str=standardizer_str,
+        beta_params=beta_params
         )
     result = Local().run(fast_lmm_set)
 
@@ -160,7 +164,7 @@ def snp_set(
         os.remove(output_file_name)
 
     return dataframe
-    
+
 
 if __name__ == "__main__":
 

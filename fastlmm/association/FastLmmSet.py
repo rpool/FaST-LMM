@@ -24,13 +24,14 @@ import logging
 import warnings
 from tempfile import TemporaryFile
 import fastlmm.util.preprocess as util
+import fastlmm.util.standardizer as stdizer
 
 class FastLmmSet: # implements IDistributable
     '''
     A class for specifying a FastLmmSet and then running it.
     '''
 
-    # member variables with default values, or those not defined in the input file    
+    # member variables with default values, or those not defined in the input file
     mpheno=1
     mindist = 2.0
     idist=1
@@ -47,7 +48,7 @@ class FastLmmSet: # implements IDistributable
     sets=None
     permute=None       # permute the SNPs being tested (or, equivalently, the compliment) using this with 1,2,3,4, etc. for different seeds, used for type I error tables
     forcefullrank = False
-    nullfit="qq"       #alternative is "ml"    
+    nullfit="qq"       #alternative is "ml"
     qmax=0.1
     minsetsize = 1
     maxsetsize = 10000000
@@ -57,7 +58,11 @@ class FastLmmSet: # implements IDistributable
     nullModel = None
     altModel = None
     genphen=None#MUST LEAVE THIS AS THE DEFAULT#{"varE":1.0,"varG":1.0, "varBack":1.0,"varCov":1.0,"link":'linear',"casefrac":0.5,"once":false}      #generate synthetic phen, using LMM, and real SNPs
-       
+    standardizer_str = ''
+    standardizer_function = None
+    beta_params = {'a': 1,
+                   'b': 25}
+
     scoring = None
     greater_is_better = None
     log = None
@@ -109,14 +114,27 @@ class FastLmmSet: # implements IDistributable
         datestamp       : Defaults to None. Use "auto" to have it generate a unique date and time string
                           to append to filenames. Otherwise, it appends whatever you set it to.
         log             : (Defaults to not changing logging level) Level of log messages, e.g. logging.CRITICAL, logging.ERROR, logging.WARNING, logging.INFO
+        standardizer_str: Lets the user specify the type of standardization (default: unit)
+        beta_params     : Lets the user specify the parameters for beta standardization (default: a=1,b=25)
         '''
-        
+
+        if(entries['standardizer_str'] == 'unit'):
+            self.standardizer_str = 'unit'
+            self.standardizer_function = stdizer.Unit()
+        elif(entries['standardizer_str'] == 'beta'):
+            self.standardizer_str = 'beta'
+            self.standardizer_function = stdizer.Beta(a=self.beta_params['a'],
+                                                      b=self.beta_params['b'])
+        elif(entries['standardizer_str'] == 'identity'):
+            self.standardizer_str = 'identity'
+            self.standardizer_function = stdizer.Identity()
+
         if hasattr(self,"ipheno"):
             assert not hasattr(self,"mpheno")
             self.mpheno = self.ipheno+1
 
         self.__dict__.update(entries)
-        self._check_entries(entries)           
+        self._check_entries(entries)
         self._ran_once = False
         self.addpostifx_to_outfile()
 
@@ -129,7 +147,7 @@ class FastLmmSet: # implements IDistributable
             self.alt_snpreader = Bed(self.alt_snpreader)
 
 
-        # convert deprecated "verbose" into "log"        
+        # convert deprecated "verbose" into "log"
         if self.hasNonNoneAttr("log") and self.hasNonNoneAttr("verbose") :
             raise Exception("log or verbose may be given, but not both")
         if self.hasNonNoneAttr("verbose"):
@@ -169,12 +187,12 @@ class FastLmmSet: # implements IDistributable
         if self.altset_list2 is None: #singleton sets
             return len(self.altsetlist_filtbysnps) * (1+self.nperm)
         else: #pairs of sets
-            return len(self.altsetlist_filtbysnps)*len(self.__altsetlist2_filtbysnps)* (1+self.nperm)   
+            return len(self.altsetlist_filtbysnps)*len(self.__altsetlist2_filtbysnps)* (1+self.nperm)
 
     def printPhenToFile(self, nInd, SNPsalt, y):
         self._synthphenfile=utilx.appendtofilename(self.outfile,"synthPhenVarBack")
         np.savetxt(self._synthphenfile,y)
-        with open(self._synthphenfile,"w") as fp: 
+        with open(self._synthphenfile,"w") as fp:
             for n in sp.arange(0,nInd):
                  fp.write(SNPsalt['iid'][n][0] +'\t'+ SNPsalt['iid'][n][1]+ "\t" + '%f' % y[n] + "\n")
 
@@ -187,30 +205,30 @@ class FastLmmSet: # implements IDistributable
                         #no matter how many times we call 'run_test' (and then 'reduce' which of course
                         #only gets run one time, and calls this too, but doesn't actually do the work).
         ttt0=time.time()
-        y=None        
+        y=None
         y_back=None
-        nInd=len(self.__y)               
-        haswrittenphen=False;                            
-                
-        if self.altset_list2 is None: #singleton sets            
+        nInd=len(self.__y)
+        haswrittenphen=False;
+
+        if self.altset_list2 is None: #singleton sets
             for iset, altset in enumerate(self.altsetlist_filtbysnps):
                 for iperm in xrange(-1, self.nperm):   #note that self.nperm is the 'stop', not the 'count'
                     SNPsalt=altset.read()
                     SNPsalt['snps'] = util.standardize(SNPsalt['snps'])
-                    G1 = SNPsalt['snps']/sp.sqrt(SNPsalt['snps'].shape[1])  
-                    ichrm =  ",".join(sp.array(sp.unique(SNPsalt['pos'][:,0]),dtype=str)) 
+                    G1 = SNPsalt['snps']/sp.sqrt(SNPsalt['snps'].shape[1])
+                    ichrm =  ",".join(sp.array(sp.unique(SNPsalt['pos'][:,0]),dtype=str))
                     minpos= str(sp.min(SNPsalt['pos'][:,2]))
                     maxpos= str(sp.max(SNPsalt['pos'][:,2]))
-                    iposrange = minpos + "-" + maxpos                     
-                    
+                    iposrange = minpos + "-" + maxpos
+
                     if self.genphen is None:
                         y=self.__y
-                    else: 
+                    else:
                         assert self.permute is None, "Error: using permute with genphen--there should be no need, use genphen['seed'] instead"
-                        self.__y=None      
+                        self.__y=None
 
                         #if (self.__G0 is not None) and y_G0 is None:  #cache so only do it once
-                        if (self.__SNPs0 is not None) and y_G0 is None:  #cache so only do it once   
+                        if (self.__SNPs0 is not None) and y_G0 is None:  #cache so only do it once
                             newseed = self.mainseed ^ self.genphen['seed']
                             from numpy.random import RandomState
                             randomstate = RandomState(newseed)
@@ -220,34 +238,34 @@ class FastLmmSet: # implements IDistributable
                             y_G0=sp.sqrt(self.genphen["varBack"]/nSnp)*self.__SNPs0['data']['snps'].dot(randomstate.rand(nSnp,1))    #TODO: CL This seems to be a bug. Should be randn
                             #y_G0=sp.sqrt(self.genphen["varBack"])*self.__SNPs0['data']['snps'].dot(randomstate.rand(nSnp,1))    #TODO: CL This seems to be a bug. Should be randn
                         elif self.__SNPs0 is None:
-                            y_G0=0      
+                            y_G0=0
 
-                        #always have the same background signal                                                
-                        if self.genphen["varBackNullFileGen"] is not None and y_back is None:                                                      
+                        #always have the same background signal
+                        if self.genphen["varBackNullFileGen"] is not None and y_back is None:
                             nSnp=self.__SNPs0['data']['snps'].shape[1]
-                            y_back=sp.sqrt(self.genphen["varBack"]/nSnp)*self.__varBackNullSnpsGen['snps'].dot(sp.random.randn(self.__varBackNullSnpsGen['snps'].shape[1],1))/sp.sqrt(self.__varBackNullSnpsGen['snps'].shape[1]) 
+                            y_back=sp.sqrt(self.genphen["varBack"]/nSnp)*self.__varBackNullSnpsGen['snps'].dot(sp.random.randn(self.__varBackNullSnpsGen['snps'].shape[1],1))/sp.sqrt(self.__varBackNullSnpsGen['snps'].shape[1])
                             #self.printPhenToFile(nInd, SNPsalt, y_back);
                         elif self.genphen.has_key("varBackNullPhenGen") and self.genphen["varBackNullPhenGen"] is not None and y_back is None:
-                            y_back=loadPhen(filename = self.genphen["varBackNullPhenGen"])['vals']                            
-                        elif y_back is None:          
-                            y_back=0                          
-                        
-                        if self.genphen["once"] and y is None: # only generate the phenotype once for entire run                            
-                            newseed = self.mainseed ^ self.genphen['seed']  
-                            assert  self.genphen["varG"]==0, "doesn't make sense to have varG>0 and only one phen--not sure why I put this code there"       
-                            if self.genphen["varG"]>0 and nInd<=SNPsalt['snps'].shape[1]:                                                       
+                            y_back=loadPhen(filename = self.genphen["varBackNullPhenGen"])['vals']
+                        elif y_back is None:
+                            y_back=0
+
+                        if self.genphen["once"] and y is None: # only generate the phenotype once for entire run
+                            newseed = self.mainseed ^ self.genphen['seed']
+                            assert  self.genphen["varG"]==0, "doesn't make sense to have varG>0 and only one phen--not sure why I put this code there"
+                            if self.genphen["varG"]>0 and nInd<=SNPsalt['snps'].shape[1]:
                                 Kall = self.KfromAltSnps(nInd) #useful for full rank
                                 y=gp.genphen(y_G0=y_G0+y_back,G1=None,covDat=self.__X,options=self.genphen,nInd=nInd,
-                                             K1=Kall,randseed=newseed)                          
-                            else:     
-                                Kall=None                                     
+                                             K1=Kall,randseed=newseed)
+                            else:
+                                Kall=None
                                 y=gp.genphen(y_G0=y_G0+y_back,G1=G1,covDat=self.__X,options=self.genphen,nInd=nInd,randseed=newseed)
-                        elif (not self.genphen["once"]):  #generate for each set in turn                           
-                            eachseed=utilx.combineseeds(iset,self.genphen['seed'])                            
-                            newseed = self.mainseed ^ eachseed                              
-                            y=gp.genphen(y_G0=y_G0+y_back,G1=G1,covDat=self.__X,options=self.genphen,nInd=nInd,randseed=newseed) 
-                                                                
-                    assert y is not None, "y is None"                                   
+                        elif (not self.genphen["once"]):  #generate for each set in turn
+                            eachseed=utilx.combineseeds(iset,self.genphen['seed'])
+                            newseed = self.mainseed ^ eachseed
+                            y=gp.genphen(y_G0=y_G0+y_back,G1=G1,covDat=self.__X,options=self.genphen,nInd=nInd,randseed=newseed)
+
+                    assert y is not None, "y is None"
                     yield lambda altset=altset,iset=iset,iperm=iperm,y=y,ichrm=ichrm, iposrange=iposrange : self.run_test(SNPs1=SNPsalt,G1=G1, y=y, altset=altset, iset=iset, iperm=iperm, ichrm=ichrm, iposrange=iposrange)
         else: #pairs of sets
             raise Exception("not implemented, started a long time ago and never finished")
@@ -261,7 +279,7 @@ class FastLmmSet: # implements IDistributable
         logging.info("---------------------------------------------------")
         logging.info("Elapsed time for all tests is %.2f seconds" % (ttt1-ttt0))
         logging.info("---------------------------------------------------")
-    
+
     def check_for_None(self, alteqnull, alteqnullperm):
         none_ind = []
         for i in range(len(alteqnull)):
@@ -316,7 +334,7 @@ class FastLmmSet: # implements IDistributable
 
         npvals=self.test.npvals
         pv_adj= sp.nan*sp.ones((len(self.altsetlist_filtbysnps)))
-              
+
         # results can come in any order, so we have to use iperm and iset to put them in the right place
         # there is one result instance for each combination of test and permutation, and here we are just gathering them
         # into the arrays from above
@@ -328,8 +346,8 @@ class FastLmmSet: # implements IDistributable
                     #iset is the index of the test (irrespective of permutation)
                     lrt[result.iset] = self.test.lrt(result)
                     alteqnull[result.iset] = result.alteqnull #equiv to result["alteqnull"]
-                    #pv_adj[result.iset,:] = self.test.pv_adj_from_result(result)                
-                    pv_adj[result.iset] = self.test.pv_adj_from_result(result)                
+                    #pv_adj[result.iset,:] = self.test.pv_adj_from_result(result)
+                    pv_adj[result.iset] = self.test.pv_adj_from_result(result)
                 else:
                     isetiperm = result.iset+result.iperm*len(self.altsetlist_filtbysnps)
                     lrtperm[isetiperm] = self.test.lrt(result)
@@ -341,18 +359,18 @@ class FastLmmSet: # implements IDistributable
         #look for None to see if anything didn't get filled in, and if so, where
         if str(self.test)[0:3]=="lrt":
             self.check_for_None(alteqnull, alteqnullperm)
-            
+
         if self.write_lrtperm and self.nperm>0:
             self._saveArray("lrtperm", ["2*(LL(alt)-LL(null))","alteqnull","setsize"], (lrtperm,alteqnullperm,setsizeperm))
-                
-        pv_adj,ind = self.test.pv_adj_and_ind(self.nperm, pv_adj, self.nullfit, 
+
+        pv_adj,ind = self.test.pv_adj_and_ind(self.nperm, pv_adj, self.nullfit,
                                               lrt, lrtperm, alteqnull, alteqnullperm,self.qmax, self.nullfitfile, self.nlocalperm)
 
         logging.info("writing the result files : " + self.outfile + "")
 
         #TODO: move the following to a function/object:
         with open(outfiletab,"w") as fp:
-            if type(self.test) is Lrt: #dan: this is ugly, will fix soon                
+            if type(self.test) is Lrt: #dan: this is ugly, will fix soon
                 self.test.write(fp, ind, result_dict, pv_adj, self.detailed_table, self.signal_ratio)
             else:
                 self.test.write(fp, ind, result_dict, pv_adj, self.detailed_table)
@@ -360,33 +378,33 @@ class FastLmmSet: # implements IDistributable
         logger.removeHandler(logging_handler)
         logging_handler.close()
         return self.outfile
-        
+
     def getRandSnpSignal(self, nSnp, nInd,genphen,newseed):
         from numpy.random import RandomState
         import fastlmm.util.gensnp as gp
-        randomstate = RandomState(newseed) 
+        randomstate = RandomState(newseed)
         nSnp=genphen["numBackSnps"]
         #randsnps=self.alt_snpreader.read(RandomSnpSet(nSnp,newseed))     #this appears to be VERY slow
-        #snps=randsnps['snps']         
-        snps=gp.gensnps(nInd,nSnp)                        
+        #snps=randsnps['snps']
+        snps=gp.gensnps(nInd,nSnp)
         randG = snps/sp.sqrt(nSnp) #pre-process for kernel
-        y_randG=sp.sqrt(genphen["varBack"])*randG.dot(randomstate.rand(nSnp,1))            
+        y_randG=sp.sqrt(genphen["varBack"])*randG.dot(randomstate.rand(nSnp,1))
         return y_randG
 
-    def TESTBEFOREUSINGKfromAltSnps(self, N, SNPsalt=None):        
-       
+    def TESTBEFOREUSINGKfromAltSnps(self, N, SNPsalt=None):
+
         print "constructing K from all SNPs"
         t0=time.time()
 
         Kall=sp.zeros([N,N])
         nSnpTotal=self.alt_snpreader.snp_count
         print "reading in " +str(nSnpTotal)+ " SNPs and adding up kernels"
-        #altsnps = readBED(self.bedfilealt,standardizeSNPs=True)['snps'] #loads all in to memory        
+        #altsnps = readBED(self.bedfilealt,standardizeSNPs=True)['snps'] #loads all in to memory
         blocksize=100
         ct=0
         ts=time.time()
-        if self.alt_snpreader.snp_count<N: raise Exception("need to adjust code to handle low rank")          
-        for start in range(0,self.alt_snpreader.snp_count,blocksize):                                
+        if self.alt_snpreader.snp_count<N: raise Exception("need to adjust code to handle low rank")
+        for start in range(0,self.alt_snpreader.snp_count,blocksize):
             ct+=blocksize
             snpSet = PositionRange(start,blocksize)
             snps = self.alt_snpreader.read(snpSet)['snps']
@@ -394,20 +412,20 @@ class FastLmmSet: # implements IDistributable
             snps = util.standardize(snps)
 
             #print "start = {0}".format(start)
-            Kall=Kall + snps.dot(snps.T)    
+            Kall=Kall + snps.dot(snps.T)
             t1=time.time()
-            if ct % 50000==0: 
+            if ct % 50000==0:
                 print "read %s SNPs in %.2f seconds" % (ct, t1-ts)
                 ts=time.time()
-            #if ct==2: 
+            #if ct==2:
             #    break
             #    Kall=sp.rand((N,N))
             #    Kall=Kall.dot(Kall.T)
-        Kall=Kall/sp.sqrt(self.alt_snpreader.snp_count)  
-        Kall=Kall + 1e-5*sp.eye(N,N)     
+        Kall=Kall/sp.sqrt(self.alt_snpreader.snp_count)
+        Kall=Kall + 1e-5*sp.eye(N,N)
         t1=time.time()
-        logging.info("%.2f seconds elapsed" % (t1-t0))        
-                
+        logging.info("%.2f seconds elapsed" % (t1-t0))
+
         return Kall
 
     def _saveArray(self, appendNameFile, header, values):
@@ -430,7 +448,7 @@ class FastLmmSet: # implements IDistributable
             fp.write('\t'.join(header) + "\n")
             for v in values:
                 fp.write("{0}\n".format( '\t'.join([str(x) for x in v]) ))
-    
+
     #!! would be nice of this was optional and if not given the OS was asked
     # required by IDistributable
     @property
@@ -459,7 +477,7 @@ class FastLmmSet: # implements IDistributable
                 copier.input(root + ".map")
         if (self.extractSim is not None):
             copier.input(self.extractSim)
-        if (self.nullfitfile is not None):                        
+        if (self.nullfitfile is not None):
             copier.input(self.nullfitfile)
         if self.genphen is not None and self.genphen.has_key("varBackNullFileGen"):
             copier.input(self.genphen["varBackNullFileGen"]+".fam")
@@ -502,9 +520,9 @@ class FastLmmSet: # implements IDistributable
         assert all( [(v in set(['effect', 'link', 'penalty', 'approx'])) for v in entries['altModel']] ),\
                'The only allow keys for altModel are effect, link, penalty, and approx.'
 
-       
 
-    def _check_params_after(self):        
+
+    def _check_params_after(self):
         self.nperm = self.test.check_nperm(self.nperm)
         if self.minsetsize is not None and self.minsetsize<1: raise Exception("minsetsize must be 1 or greater")
         if self.nullfitfile is not None: assert (self.nperm is None or self.nperm==0), "if using nullfitfile then nperm should be 0"
@@ -515,22 +533,22 @@ class FastLmmSet: # implements IDistributable
             if 'casefrac' not in self.genphen.keys(): self.genphen['casefrac']=None
             if 'fracCausal' not in self.genphen.keys(): self.genphen['fracCausal']=1.0
             if 'numBackSnps' not in self.genphen.keys(): self.genphen['numBackSnps']=0
-            if 'varBackNullFileGen' not in self.genphen.keys(): self.genphen['varBackNullFileGen']=None  
-    
+            if 'varBackNullFileGen' not in self.genphen.keys(): self.genphen['varBackNullFileGen']=None
+
     def _check_params_before(self):
         pass
         #if self.test== "lrt_up" and self.filenull is None:
         #    self.test = "lrt"
-                   
+
     def pv_from_localperm(self, iperm, result, t0, varcomp_test, y):
         '''
-        This is not test specific, but is currently only implemented for LRT. No code would 
+        This is not test specific, but is currently only implemented for LRT. No code would
         need to be changed here for other tests, only the test-specific files elsewhere.
         '''
         assert iperm==-1, "should not be permuting for global null fit here, only local"
-        assert str(self.test)=="lrt", "can only use local permutations with lrt, not with " + str(self.test)            
+        assert str(self.test)=="lrt", "can only use local permutations with lrt, not with " + str(self.test)
         assert self.altModel["effect"]=="mixed" and self.altModel["link"]=="linear", "nlocalperm only set up for linear lrt at the moment"
-        assert self.nullModel["effect"]=="fixed", "nlocalperm only set up for one-kernel" 
+        assert self.nullModel["effect"]=="fixed", "nlocalperm only set up for one-kernel"
         #assert self.__G0 is None, "only 1-kernel implemented"
         assert self.__SNPs0 is None, "only 1-kernel implemented"
         logging.info("running up to " + str(self.nlocalperm) + " local permutations")
@@ -545,30 +563,30 @@ class FastLmmSet: # implements IDistributable
         powerneeded=2
         for pm in xrange(self.nlocalperm):
             if pm==checkpoint:
-                logging.info('checkpointing '  + str(pm))                    
+                logging.info('checkpointing '  + str(pm))
                 numbetter=sp.sum(permstatbetter)
-                pv=numbetter/float(pm)                                
+                pv=numbetter/float(pm)
                 t1=time.time()
                 logging.info("Checkpoint time elapsed=%.2f seconds" % (t1-t0))
                 if pv*checkpoint>=10**powerneeded:
                     logging.info("stopping due to checkpoint")
                     break;
                 checkpoint=checkpoint*2
-            
+
             permutationIndex = utilx.generatePermutation(y.shape[0],randomstate)
-            yperm=y[permutationIndex]           
-            Xperm=self.__X[permutationIndex]                
-                                                                   
-            permresult = varcomp_test.testGupdate(yperm,Xperm,self.test)  
+            yperm=y[permutationIndex]
+            Xperm=self.__X[permutationIndex]
+
+            permresult = varcomp_test.testGupdate(yperm,Xperm,self.test)
             allstat.append(permresult['stat'])
             alteqnullperm.append(permresult['alteqnull'])
-            permstatbetter.append(permresult['stat']-result.test['stat']>tol)  
-                       
+            permstatbetter.append(permresult['stat']-result.test['stat']>tol)
+
         numbetter=sp.maximum(0.99,sp.sum(permstatbetter))
-        pv=numbetter/float(pm) 
+        pv=numbetter/float(pm)
         result.test['pv-local']=pv
         result.test['pv']=result.test['pv']
-        
+
         if self.fitlocal and pv*pm<10**powerneeded:
             import fastlmm.association.tests.Cv as cv
             logging.info("fitting aUD to local with " + str(pm+1) + " permutations")
@@ -579,9 +597,9 @@ class FastLmmSet: # implements IDistributable
             logging.info("scale="+str(scale))
         else:
             result.test['pv-local-aUD']=sp.NaN
-        
+
         logging.info("    used " + str(pm+1) + " permutations to compute p=" + str(pv) + ", p50=" + str(result.test['pv']))
-        
+
     def G_exclude(self, i_exclude):
         if self.__SNPs0.has_key("data"):
             G_exclude = self.__SNPs0["data"]["snps"][:,i_exclude]
@@ -609,16 +627,16 @@ class FastLmmSet: # implements IDistributable
             a list (often just one) of
                 instances of the Result class, varcomp (for caching)
         '''
-        t0=time.time()            
+        t0=time.time()
 
-        self.run_once() #load files, etc. -- stuff we only want to do once no matter how many times we call 'run_test' and then 'reduce.        
+        self.run_once() #load files, etc. -- stuff we only want to do once no matter how many times we call 'run_test' and then 'reduce.
 
         logging.info("Working on permutation index #{0} (where -1 means no permutation) out of {1} total permutations...".format(iperm, self.nperm))
         logging.info("\taltset {0}, {1} of {2}  ".format(altset, iset, len(self.altsetlist_filtbysnps)))
-                      
+
         result = Result(iperm=iperm,iset=iset,setname=str(altset), ichrm=ichrm, iposrange=iposrange)
-         
-        if varcomp_test is None or not self.cache_from_perm:            
+
+        if varcomp_test is None or not self.cache_from_perm:
             if G1.shape[1]==0:
                 logging.info( "no SNPS in set " + setname )
                 result=None
@@ -626,8 +644,8 @@ class FastLmmSet: # implements IDistributable
             if sp.isnan(G1.sum()): raise Exception("found missing values in test SNPs that remain after intersection for " + str(altset))
 
             result.setsize = SNPs1['snps'].shape[1]
-                
-            logging.info(" (" + str(result.setsize) + " SNPs)")              
+
+            logging.info(" (" + str(result.setsize) + " SNPs)")
 
             if self.filenull is not None:
                 if self.__SNPs0.has_key('data'):
@@ -643,13 +661,13 @@ class FastLmmSet: # implements IDistributable
 
 
         if self.permute is not None: #permute the data to test for type I error
-                permutationIndex = utilx.generatePermutation(SNPs1['snps'].shape[0],self.mainseed ^ self.permute)      
+                permutationIndex = utilx.generatePermutation(SNPs1['snps'].shape[0],self.mainseed ^ self.permute)
         if iperm >= 0 :  #permute the data to create Null-only P-values for lrt null fitting
-            eachseed=utilx.combineseeds(self.calseed,iperm)            
-            newseed = self.mainseed ^ eachseed  
+            eachseed=utilx.combineseeds(self.calseed,iperm)
+            newseed = self.mainseed ^ eachseed
 
             if self.permute is not None :
-                #Add a left shift so that iperm=1 and self.permute=2 gives a different newseed than 
+                #Add a left shift so that iperm=1 and self.permute=2 gives a different newseed than
                 #iperm=2 and self.permute=1
                 newseed = (newseed << 1) ^ self.permute
             permutationIndex = utilx.generatePermutation(SNPs1['snps'].shape[0], newseed)
@@ -660,31 +678,31 @@ class FastLmmSet: # implements IDistributable
 
             #if result.nexclude:
             #    logging.info(" (computing needed null info anew) ")
-            #    G0_to_use = self.__SNPs0#['data']['snps'][:,~i_exclude]/SP.sqrt(self.__SNPs0['data']['snps'][:,~i_exclude].shape[1])   
-            #else: 
+            #    G0_to_use = self.__SNPs0#['data']['snps'][:,~i_exclude]/SP.sqrt(self.__SNPs0['data']['snps'][:,~i_exclude].shape[1])
+            #else:
             #    G0_to_use=self.__G0
-        
+
             if (str(self.test)!="lrt_up") and (self.genphen is not None) and (not self.genphen['once']) or ((str(self.test)!="lrt_up") and result.nexclude>0) or self.__varcomp_test is None:
                 #need to re-construct the test (can't cache)
-                #note that if result.nexclude kicked in, then this would happen in clause above anyhow                               
+                #note that if result.nexclude kicked in, then this would happen in clause above anyhow
                 varcomp_test = self.varcomp_test_setup(y,self.__SNPs0,i_exclude)
-            else: #use cached values                
+            else: #use cached values
                 #G0_to_use=self.__G0
                 varcomp_test=self.__varcomp_test
                 #varcomp_test.i_exclude=i_exclude
-                
+
                 logging.info(" (using cached null info)")
-            
-            #create G_exclude                         
+
+            #create G_exclude
             if (str(self.test)=="lrt_up" and result.nexclude>0):
                 G_exclude = self.G_exclude(i_exclude)
             else:
-                G_exclude = None            
-         
-            result.test = varcomp_test.testG(G1,self.test, i_exclude=i_exclude,G_exclude=G_exclude)             
-            logging.info("p=%.2e",result.test['pv'])                   
+                G_exclude = None
 
-            # do the permutations here, rather than as they would normally be done with a seperate call to             
+            result.test = varcomp_test.testG(G1,self.test, i_exclude=i_exclude,G_exclude=G_exclude)
+            logging.info("p=%.2e",result.test['pv'])
+
+            # do the permutations here, rather than as they would normally be done with a seperate call to
             if self.nlocalperm is not None and self.nlocalperm>0:
                 self.pv_from_localperm(iperm, result, t0, varcomp_test, y)
         else: #caching for 1-kernel LRT (save expensive stuff from non-permuted run)
@@ -692,17 +710,17 @@ class FastLmmSet: # implements IDistributable
             assert iperm!=-1, "should be a permutation run"
             assert str(self.test)=="lrt", "can only use lrt, here now"
             assert self.altModel["effect"]=="mixed" and self.altModel["link"]=="linear", "caching only set up for linear lrt at the moment"
-            assert self.nullModel["effect"]=="fixed", "caching only set up for one-kernel" 
+            assert self.nullModel["effect"]=="fixed", "caching only set up for one-kernel"
             assert self.__G0 is None, "caching only 1-kernel implemented, otherwise need to permute G0 as well here"
 
-            #permute X, y instead of G1 so can use caching                  
-            yperm=y[permutationIndex]                
-            Xperm=self.__X[permutationIndex]       
-            result = varcomp_test.testGupdate(yperm,Xperm,self.test)  
-                                                  
+            #permute X, y instead of G1 so can use caching
+            yperm=y[permutationIndex]
+            Xperm=self.__X[permutationIndex]
+            result = varcomp_test.testGupdate(yperm,Xperm,self.test)
+
         t1=time.time()
         logging.info("%.2f seconds elapsed in run_test" % (t1-t0))
-                
+
         return [result]
 
     def TESTBEFOREUSING_run_interactiontest(self,altset,iset,altset2,iset2,iperm = -1):
@@ -738,7 +756,7 @@ class FastLmmSet: # implements IDistributable
 
         SNPs1=dict(SNPs1a)
         SNPs1.update(SNPs1b) #concatenate the SNP dictionaries
-  
+
         G1 = SNPs1['snps']/sp.sqrt(SNPs1['snps'].shape[1])
         if G1.shape[1]==0: raise Exception("no SNPs to test")
         result.setsize = SNPs1['snps'].shape[1]
@@ -774,7 +792,7 @@ class FastLmmSet: # implements IDistributable
             null_model=None
         else: #use cached values
             G0_to_use=self.__G0
-            null_model=self.__varcomp_test           
+            null_model=self.__varcomp_test
             logging.info(" (using cached null info)")
 
         [result.pv,result.lik0,result.lik1] = self.test.pv_etc(filenull, G0_to_use, G1, y, x, appendBias, null_model, self.__varcomp_test, forcefullrank)
@@ -786,8 +804,8 @@ class FastLmmSet: # implements IDistributable
         logging.info("%.2f seconds elapsed" % (t1-t0))
 
         return result
-  
-    def setSNPs0(self):        
+
+    def setSNPs0(self):
         logging.info("Reading SNPs0")
         root, ext = os.path.splitext(self.filenull)
         if (self.autoselect):
@@ -823,16 +841,16 @@ class FastLmmSet: # implements IDistributable
 
             self.__SNPs0 = {
                 "data":readPED("select/null"),
-                "filename":"select/null",                
+                "filename":"select/null",
                 }
             self.__SNPs0["original_iids"] = self.__SNPs0["data"]["iid"]
             self.__SNPs0["num_snps"] = self.__SNPs0["data"]["snps"].shape[1]
-        else:                   
+        else:
             if ext.lower() == ".bed":
-                snp_set = CreateSnpSetReaderForFileNull(self.extractSim)  
+                snp_set = CreateSnpSetReaderForFileNull(self.extractSim)
                 bed = Bed(root)
                 snp_set_bed = snp_set.addbed(bed)
-                num_snps = len(snp_set_bed)                
+                num_snps = len(snp_set_bed)
                 self.__SNPs0={
                     "snp_set":snp_set_bed,
                     "reader":snp_set_bed.bed,
@@ -850,16 +868,16 @@ class FastLmmSet: # implements IDistributable
                 self.__SNPs0["original_iids"] = self.__SNPs0["data"]["iid"]
                 self.__SNPs0["num_snps"] = self.__SNPs0["data"]["snps"].shape[1]
 
-    def varcomp_test_setup(self,y,SNPs0=None, i_exclude=None): 
+    def varcomp_test_setup(self,y,SNPs0=None, i_exclude=None):
         #in case we exclude all SNPs (needed for score, not for lrt, not sure about lrt_up)
-        nullModelTmp=self.nullModel.copy()           
+        nullModelTmp=self.nullModel.copy()
         if (i_exclude is not None) and SNPs0['num_snps']==i_exclude.sum():
-            excluded_all_snps = True           
+            excluded_all_snps = True
             nullModelTmp['effect']='fixed'
         else:
-            excluded_all_snps = False        
+            excluded_all_snps = False
 
-        if self.filenull is not None and (not excluded_all_snps): #aka two-kernel after exclusion has been done        
+        if self.filenull is not None and (not excluded_all_snps): #aka two-kernel after exclusion has been done
             varcomp_test = self.test.construct(y,self.__X, forcefullrank = self.forcefullrank,
                              SNPs0 = SNPs0, i_exclude = i_exclude, nullModel = self.nullModel, altModel = self.altModel,
                              scoring = self.scoring, greater_is_better = self.greater_is_better)
@@ -867,7 +885,7 @@ class FastLmmSet: # implements IDistributable
             varcomp_test = self.test.construct_no_backgound_kernel(y,self.__X,
                              forcefullrank = self.forcefullrank, nullModel = nullModelTmp,
                              altModel = self.altModel, scoring = self.scoring,
-                             greater_is_better = self.greater_is_better)        
+                             greater_is_better = self.greater_is_better)
         return varcomp_test
 
     #so that it only ever gets changed once, in run_once
@@ -880,13 +898,13 @@ class FastLmmSet: # implements IDistributable
     def mainseed(self):
         '''used to xor indexes with to get seeds for other purposes'''
         return 34343
-       
+
     def run_once(self):
         '''
-        Loading datasets (but not SNPs for alternative), etc. that we want to do only once no mater how many times we call 'run_test' and then perhaps 'reduce'.        '''         
-               
-        if self.calseed is not None:            
-            self._seed=utilx.combineseeds(self.calseed,self.mainseed)                        
+        Loading datasets (but not SNPs for alternative), etc. that we want to do only once no mater how many times we call 'run_test' and then perhaps 'reduce'.        '''
+
+        if self.calseed is not None:
+            self._seed=utilx.combineseeds(self.calseed,self.mainseed)
             #self._seed = self.calseed ^ self.mainseed
         else:
             self._seed = self.mainseed
@@ -898,7 +916,7 @@ class FastLmmSet: # implements IDistributable
 
         logging.info("Running Once")
 
-        self._check_params_before() #must be called before test object Lrt(), Cv(), Sc() is created       
+        self._check_params_before() #must be called before test object Lrt(), Cv(), Sc() is created
         #!! make this nicer
         if self.test=="lrt":
             self.test = Lrt()
@@ -911,18 +929,18 @@ class FastLmmSet: # implements IDistributable
         elif self.test=="sc_mom":
             self.test = Sc("mom")
         else:
-            raise Exception("Don't know how to construct {0}".format(self.test))        
-        self._check_params_after() #must be called after test object Lrt(), Cv(), Sc() is created         
+            raise Exception("Don't know how to construct {0}".format(self.test))
+        self._check_params_after() #must be called after test object Lrt(), Cv(), Sc() is created
 
         phenhead,phentail=os.path.split(self.phenofile)
-        logging.info("Reading Pheno: " +  phentail + "")        
-        pheno = loadPhen(filename = self.phenofile)     
+        logging.info("Reading Pheno: " +  phentail + "")
+        pheno = loadPhen(filename = self.phenofile)
         pheno['vals']=pheno['vals'][:,self.mpheno-1]#use -1 so compatible with C++ version
-        #pheno['header']=pheno['header'][self.mpheno-1] #header is empty 
+        #pheno['header']=pheno['header'][self.mpheno-1] #header is empty
         goodind=sp.logical_not(sp.isnan(pheno['vals']))
         pheno['vals']=pheno['vals'][goodind]
-        pheno['iid']=pheno['iid'][goodind,:]        
-           
+        pheno['iid']=pheno['iid'][goodind,:]
+
         if self.genphen is not None:
             #for synthetic data generation--this is the background signal added to the phenotype
             if self.genphen["varBackNullFileGen"] is not None:
@@ -951,14 +969,14 @@ class FastLmmSet: # implements IDistributable
             elif self.covarimp is None:
                 pass
             else:
-                raise Exception("covarimp=" + self.covarimp + " not implemented")          
+                raise Exception("covarimp=" + self.covarimp + " not implemented")
 
         covar,pheno,indarr=self.intersect_data(covar, pheno)
         N=pheno['vals'].shape[0];
         if self.covarfile==None:
             self.__X = sp.ones((N,1))
         else:
-            #check for covariates which are constant, as the lmm code crashes on these            
+            #check for covariates which are constant, as the lmm code crashes on these
             badind = utilx.indof_constfeatures(covar['vals'], axis=0)
             if len(badind)>0:
                 raise Exception("found constant covariates with indexes: %s: please remove, or modify code here to do so" % badind)
@@ -979,9 +997,9 @@ class FastLmmSet: # implements IDistributable
         if self.npermabs is not None:
             num_tests = len(self.altsetlist_filtbysnps)
             self.nperm = int(sp.ceil(self.npermabs/num_tests))
-            logging.info("using npermabs=%i, found %i tests, so using %i permutations per test" % (self.npermabs, num_tests, self.nperm))            
+            logging.info("using npermabs=%i, found %i tests, so using %i permutations per test" % (self.npermabs, num_tests, self.nperm))
             self.npermabs = None
-        
+
         logging.info("------------------------------------------------")
         logging.info("Found " + str(self.__X.shape[0]) +  " individuals")
         logging.info("Found " + str(self.__X.shape[1]) +  " covariates (including bias)")
@@ -997,21 +1015,21 @@ class FastLmmSet: # implements IDistributable
         #CL3_28_14:The following never evaluates True, as it should be #if str(self.test)=="lrt":
         #but the body is buggy, so it would crash
         #if self.test=="lrt":
-        #    logging.info("nullmodel: " + "link=" + self.nullModel['link'] + ", " 
+        #    logging.info("nullmodel: " + "link=" + self.nullModel['link'] + ", "
         #                          + "approx=" + self.nullModel['approx'] + ", "
         #                          + "pen="+ self.nullModel['penalty'])
-        #    logging.info("altmodel: " + "link=" + self.altModel['link'] + ", " 
+        #    logging.info("altmodel: " + "link=" + self.altModel['link'] + ", "
         #                          + "approx=" + self.altModel['approx'] + ", "
-        #                          + "pen="+ self.altModel['penalty'])        
+        #                          + "pen="+ self.altModel['penalty'])
         logging.info("Found " + str(self.work_count/(self.nperm+1)) + " tests to run (" + str(self.work_count) + " work items, including " + str(self.nperm) + " permutations)")
         if self.nullfitfile is not None:
             logging.info("nullfitfile=" + self.nullfitfile)
         if self.altset_list2 is not None:
             logging.info("(running paired set tests)")
         else:
-            logging.info("(running single set tests)")        
+            logging.info("(running single set tests)")
         if self.minsetsize is not None and self.maxsetsize is not None:
-            logging.info("min set size=%i, max set size=%i", self.minsetsize, self.maxsetsize) 
+            logging.info("min set size=%i, max set size=%i", self.minsetsize, self.maxsetsize)
         if self.mpheno is not None: logging.info("mpheno=%i", self.mpheno)
         if self.extractSim is not None: logging.info("extractSim=%s",self.extractSim)
         logging.info("------------------------------------------------")
@@ -1019,16 +1037,16 @@ class FastLmmSet: # implements IDistributable
         logging.info("Creating null model... ")
         #cache whatever is needed for each case (sometimes likelihood, sometimes rotated items, sometimes nothing)
         t0=time.time()
-        
+
         #if self.filenull is not None: #aka two-kernel
-        #    self.__G0 = self.__SNPs0['data']['snps']/sp.sqrt(self.__SNPs0['data']['snps'].shape[1])        
+        #    self.__G0 = self.__SNPs0['data']['snps']/sp.sqrt(self.__SNPs0['data']['snps'].shape[1])
         #else:
         #    self.__G0=None
-        
+
         #for some models, this caches important and expensive information
-        #as appropriate, gets re-computed in run_test()        
-        if self.genphen is None: #or self.genphen['once']: THIS CAUSES REAL DATA TO GET USED         
-            #self.__varcomp_test=self.varcomp_test_setup(self.__y,self.__G0)            
+        #as appropriate, gets re-computed in run_test()
+        if self.genphen is None: #or self.genphen['once']: THIS CAUSES REAL DATA TO GET USED
+            #self.__varcomp_test=self.varcomp_test_setup(self.__y,self.__G0)
             self.__varcomp_test=self.varcomp_test_setup(self.__y,self.__SNPs0)
         #elif self.genphen is not None and self.__G0 is not None:
         elif self.genphen is not None and self.__SNPs0 is not None:
@@ -1041,7 +1059,7 @@ class FastLmmSet: # implements IDistributable
         t1=time.time()
         logging.info("done. %.2f seconds elapsed" % (t1-t0))
 
-    def check_id_order(self, covar, pheno):        
+    def check_id_order(self, covar, pheno):
         ids_pheno=pheno['iid']
         ids_SNPs=self.alt_snpreader.original_iids
         if (len(ids_pheno)!=len(ids_SNPs)) or (not sp.all(ids_pheno==ids_SNPs)):
@@ -1052,7 +1070,7 @@ class FastLmmSet: # implements IDistributable
         if self.filenull is not None:
             ids_nullSNPs=self.__SNPs0['original_iids']
             if not sp.all(ids_pheno==ids_nullSNPs): return False
-        if hasattr(self,"__varBackNullSnpsGen") and self.__varBackNullSnpsGen is not None: #for synthetic data generation            
+        if hasattr(self,"__varBackNullSnpsGen") and self.__varBackNullSnpsGen is not None: #for synthetic data generation
             ids_SNPgen=self.__varBackNullSnpsGen["iid"]
             if not sp.all(ids_pheno==ids_SNPgen): return False
         return True
@@ -1061,8 +1079,8 @@ class FastLmmSet: # implements IDistributable
         if self.check_id_order(covar,pheno):
             indarr = SP.arange(pheno['iid'].shape[0])
             logging.info(str(indarr.shape[0]) + " IDs match up across data sets")
-        else:            
-            logging.info("IDs do not match up, so intersecting the data over individuals")            
+        else:
+            logging.info("IDs do not match up, so intersecting the data over individuals")
             if self.filenull is not None:
                 nullsnpids=self.__SNPs0['original_iids']
             else:
@@ -1079,11 +1097,11 @@ class FastLmmSet: # implements IDistributable
             #the order of inputs here is reflected in the reordering indexes below of 0,1,2,3,4
             import warnings
             #!!warnings.warn("This intersect_ids is deprecated. Pysnptools includes newer versions of intersect_ids", DeprecationWarning)
-            indarr=utilx.intersect_ids([pheno['iid'],self.alt_snpreader.original_iids,covarids,nullsnpids,varbacknullsnp])            
+            indarr=utilx.intersect_ids([pheno['iid'],self.alt_snpreader.original_iids,covarids,nullsnpids,varbacknullsnp])
             assert indarr.shape[0]>0, "no individuals remain after intersection, check that ids match in files"
-            #sort the indexes so that SNPs ids in their original order (and 
+            #sort the indexes so that SNPs ids in their original order (and
             #therefore we have to move things around in memory the least amount)
-            #[indarr[:,3] holds the SNP order    
+            #[indarr[:,3] holds the SNP order
             sortind=sp.argsort(indarr[:,3])
             indarr=indarr[sortind]
 
@@ -1096,7 +1114,7 @@ class FastLmmSet: # implements IDistributable
                 covar['iid']=covar['iid'][indarr[:,2]]
                 covar['vals']=covar['vals'][indarr[:,2]]
 
-            if self.filenull is not None:  
+            if self.filenull is not None:
                 #copy in memory to make later access faster (presumably?):
                 #self.__SNPs0['iid']=sp.copy(self.__SNPs0['iid'][indarr[:,3]])
                 #self.__SNPs0['snps']=sp.copy(self.__SNPs0['snps'][indarr[:,3]])
@@ -1113,7 +1131,7 @@ class FastLmmSet: # implements IDistributable
                 self.__varBackNullSnpsGen['snps']=self.__varBackNullSnpsGen['snps'][indarr[:,4]]
 
             logging.info(str(indarr.shape[0]) + " ids left")
-        
+
         return covar,pheno,indarr
 
 
@@ -1170,7 +1188,7 @@ class FastLmmSet: # implements IDistributable
 def CreateSnpSetReaderForFileNull(snp_set):
     if (snp_set is None):
         return AllSnps()
-    if isinstance(snp_set, str):        
+    if isinstance(snp_set, str):
         return SnpsFromFile(snp_set)
     return snp_set
 
@@ -1179,8 +1197,8 @@ def CreateSnpSetReaderForFileNull(snp_set):
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     logging.info("last modified: %s" % time.ctime(os.path.getmtime(__file__)))
-    logging.info("-------------------------------------------------")       
-    
+    logging.info("-------------------------------------------------")
+
     # Parse the command line
     if len(sys.argv) == 2:
         sys.argv.append("Local()")
@@ -1190,14 +1208,14 @@ if __name__ == "__main__":
     file,infile,runner_string = sys.argv
     if not os.path.exists(infile): raise Exception("Fatal Error: " + infile + " does not exist")
 
-    #Run the job specified in infile    
+    #Run the job specified in infile
     from fastlmm.association.FastLmmSet import *
     exec("runner = " + runner_string)
-    d = open(infile).read()    
-    exec(d)     
-          
-    tt0=time.time()    
-    runner.run(distributable)    
+    d = open(infile).read()
+    exec(d)
+
+    tt0=time.time()
+    runner.run(distributable)
     tt1=time.time()
     logging.info("Final elapsed time for all processing is %.2f seconds" % (tt1-tt0))
 
