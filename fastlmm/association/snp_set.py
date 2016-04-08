@@ -28,8 +28,7 @@ def snp_set(
         maxsetsize = None,
         mindist=0,
         idist=1,
-        standardizer_str='unit',
-        beta_params={'a': 1, 'b': 25}
+        standardizer_str='Unit()'
     ):
     """
     Function performing GWAS on sets of snps
