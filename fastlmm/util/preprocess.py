@@ -41,7 +41,7 @@ def standardize(snps, blocksize=None, standardizer=stdizer.Unit(), force_python_
     '''
     #!!warnings.warn("This standardizer is deprecated. Pysnptools includes newer versions of standardization", DeprecationWarning)
     if isinstance(standardizer, str):
-        standardizer = standardizer.factor(standardizer)
+        standardizer = stdizer.factory(s=standardizer)
 
     if blocksize >= snps.shape[1]: #If blocksize is larger than the # of snps, set it to None
         blocksize = None

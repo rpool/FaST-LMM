@@ -7,6 +7,7 @@ from .Unit import *
 
 def factory(s):
     s = s.capitalize()
+
     if s == "Unit" or s=="Unit()":
         return Unit()
 
@@ -16,6 +17,9 @@ def factory(s):
     if s.startswith("Beta("):
         standardizer = eval(s)
         return standardizer
+
+    if s=="Identity" or s=='Identity()':
+        return Identity()
 
 def standardize_with_lambda(snps, lambdax, blocksize = None):
     if blocksize==None:

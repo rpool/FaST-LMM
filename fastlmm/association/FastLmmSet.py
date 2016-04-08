@@ -25,6 +25,7 @@ import warnings
 from tempfile import TemporaryFile
 import fastlmm.util.preprocess as util
 import fastlmm.util.standardizer as stdizer
+# import pysnptools.standardizer as stdizer
 
 class FastLmmSet: # implements IDistributable
     '''
@@ -58,11 +59,7 @@ class FastLmmSet: # implements IDistributable
     nullModel = None
     altModel = None
     genphen=None#MUST LEAVE THIS AS THE DEFAULT#{"varE":1.0,"varG":1.0, "varBack":1.0,"varCov":1.0,"link":'linear',"casefrac":0.5,"once":false}      #generate synthetic phen, using LMM, and real SNPs
-    standardizer_str = ''
-    standardizer_function = None
-    beta_params = {'a': 1,
-                   'b': 25}
-
+    standardizer_str = 'Unit()'
     scoring = None
     greater_is_better = None
     log = None
@@ -114,20 +111,8 @@ class FastLmmSet: # implements IDistributable
         datestamp       : Defaults to None. Use "auto" to have it generate a unique date and time string
                           to append to filenames. Otherwise, it appends whatever you set it to.
         log             : (Defaults to not changing logging level) Level of log messages, e.g. logging.CRITICAL, logging.ERROR, logging.WARNING, logging.INFO
-        standardizer_str: Lets the user specify the type of standardization (default: unit)
-        beta_params     : Lets the user specify the parameters for beta standardization (default: a=1,b=25)
+        standardizer_str: Lets the user specify the type of standardization (default: 'Unit()')
         '''
-
-        if(entries['standardizer_str'] == 'unit'):
-            self.standardizer_str = 'unit'
-            self.standardizer_function = stdizer.Unit()
-        elif(entries['standardizer_str'] == 'beta'):
-            self.standardizer_str = 'beta'
-            self.standardizer_function = stdizer.Beta(a=self.beta_params['a'],
-                                                      b=self.beta_params['b'])
-        elif(entries['standardizer_str'] == 'identity'):
-            self.standardizer_str = 'identity'
-            self.standardizer_function = stdizer.Identity()
 
         if hasattr(self,"ipheno"):
             assert not hasattr(self,"mpheno")
@@ -214,7 +199,8 @@ class FastLmmSet: # implements IDistributable
             for iset, altset in enumerate(self.altsetlist_filtbysnps):
                 for iperm in xrange(-1, self.nperm):   #note that self.nperm is the 'stop', not the 'count'
                     SNPsalt=altset.read()
-                    SNPsalt['snps'] = util.standardize(SNPsalt['snps'])
+                    SNPsalt['snps'] = util.standardize(SNPsalt['snps'],
+                                                       standardizer=self.standardizer_str)
                     G1 = SNPsalt['snps']/sp.sqrt(SNPsalt['snps'].shape[1])
                     ichrm =  ",".join(sp.array(sp.unique(SNPsalt['pos'][:,0]),dtype=str))
                     minpos= str(sp.min(SNPsalt['pos'][:,2]))
@@ -409,7 +395,8 @@ class FastLmmSet: # implements IDistributable
             snpSet = PositionRange(start,blocksize)
             snps = self.alt_snpreader.read(snpSet)['snps']
             import fastlmm.util.preprocess as util
-            snps = util.standardize(snps)
+            snps = util.standardize(snps,
+                                    standardizer=self.standardizer_str)
 
             #print "start = {0}".format(start)
             Kall=Kall + snps.dot(snps.T)
@@ -607,7 +594,8 @@ class FastLmmSet: # implements IDistributable
             snp_names = self.__SNPs0["reader"].rs[i_exclude]
             snp_set = SnpAndSetName('G_exclude', snp_names)
             G_exclude = self.__SNPs0["reader"].read(snp_set)['snps']
-            G_exclude = util.standardize(G_exclude)
+            G_exclude = util.standardize(G_exclude,
+                                         standardizer=self.standardizer_str)
             #normalize
             pass
         G_exclude/=sp.sqrt(self.__SNPs0["num_snps"])
