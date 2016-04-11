@@ -151,8 +151,7 @@ def snp_set(
         minsetsize = minsetsize,
         maxsetsize = maxsetsize,
         write_lrtperm = write_lrtperm,
-        standardizer_str=standardizer_str,
-        beta_params=beta_params
+        standardizer_str=standardizer_str
         )
     result = Local().run(fast_lmm_set)
 
